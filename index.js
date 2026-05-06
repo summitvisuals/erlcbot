@@ -35,50 +35,96 @@ function isStaff(member, guildId) {
   return config[guildId]?.staffRole && member.roles.cache.has(config[guildId].staffRole);
 }
 
-// 🧠 COMMANDS
+// 🧠 COMMANDS (FIXED)
 const commands = [
   new SlashCommandBuilder()
     .setName('session')
-    .setDescription('Manage sessions')
-    .addSubcommand(s => s.setName('start').setDescription('Start').addStringOption(o => o.setName('code').setRequired(true)))
-    .addSubcommand(s => s.setName('end').setDescription('End')),
+    .setDescription('Manage ERLC sessions')
+    .addSubcommand(s =>
+      s.setName('start')
+        .setDescription('Start a session')
+        .addStringOption(o =>
+          o.setName('code')
+            .setDescription('Server code')
+            .setRequired(true)
+        )
+    )
+    .addSubcommand(s =>
+      s.setName('end')
+        .setDescription('End the session')
+    ),
 
   new SlashCommandBuilder()
     .setName('configure')
-    .setDescription('Setup bot')
-    .addRoleOption(o => o.setName('staffrole').setDescription('Staff role'))
-    .addChannelOption(o => o.setName('logchannel').setDescription('Log channel')),
+    .setDescription('Configure the bot')
+    .addRoleOption(o =>
+      o.setName('staffrole')
+        .setDescription('Set the staff role')
+    )
+    .addChannelOption(o =>
+      o.setName('logchannel')
+        .setDescription('Set the log channel')
+    ),
 
   new SlashCommandBuilder()
     .setName('ban')
-    .setDescription('Ban user')
-    .addUserOption(o => o.setName('user').setRequired(true))
-    .addStringOption(o => o.setName('reason')),
+    .setDescription('Ban a user')
+    .addUserOption(o =>
+      o.setName('user')
+        .setDescription('User to ban')
+        .setRequired(true)
+    )
+    .addStringOption(o =>
+      o.setName('reason')
+        .setDescription('Reason for ban')
+    ),
 
   new SlashCommandBuilder()
     .setName('kick')
-    .setDescription('Kick user')
-    .addUserOption(o => o.setName('user').setRequired(true))
-    .addStringOption(o => o.setName('reason')),
+    .setDescription('Kick a user')
+    .addUserOption(o =>
+      o.setName('user')
+        .setDescription('User to kick')
+        .setRequired(true)
+    )
+    .addStringOption(o =>
+      o.setName('reason')
+        .setDescription('Reason for kick')
+    ),
 
   new SlashCommandBuilder()
     .setName('timeout')
-    .setDescription('Timeout user')
-    .addUserOption(o => o.setName('user').setRequired(true))
-    .addIntegerOption(o => o.setName('minutes').setRequired(true)),
+    .setDescription('Timeout a user')
+    .addUserOption(o =>
+      o.setName('user')
+        .setDescription('User to timeout')
+        .setRequired(true)
+    )
+    .addIntegerOption(o =>
+      o.setName('minutes')
+        .setDescription('Time in minutes')
+        .setRequired(true)
+    ),
 
   new SlashCommandBuilder()
     .setName('warn')
-    .setDescription('Warn user')
-    .addUserOption(o => o.setName('user').setRequired(true))
-    .addStringOption(o => o.setName('reason'))
+    .setDescription('Warn a user')
+    .addUserOption(o =>
+      o.setName('user')
+        .setDescription('User to warn')
+        .setRequired(true)
+    )
+    .addStringOption(o =>
+      o.setName('reason')
+        .setDescription('Reason for warning')
+    )
 ];
 
 const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
 
 (async () => {
   await rest.put(
-    Routes.applicationCommands('1497762509380255865'),
+    Routes.applicationCommands('1497762509380255865'), // 🔥 REPLACE THIS
     { body: commands }
   );
 })();
@@ -106,12 +152,21 @@ client.on('interactionCreate', async interaction => {
 
   // 🔘 BUTTONS
   if (interaction.isButton()) {
+    if (!activeSession) {
+      return interaction.reply({ content: 'No active session.', ephemeral: true });
+    }
+
     if (interaction.customId === 'copy_code') {
-      return interaction.reply({ content: `📋 Code: **${activeSession.code}**`, ephemeral: true });
+      return interaction.reply({
+        content: `📋 Code: **${activeSession.code}**`,
+        ephemeral: true
+      });
     }
 
     if (interaction.customId === 'end_session') {
-      if (!isStaff(interaction.member, guildId)) return interaction.reply({ content: '❌ Not staff.', ephemeral: true });
+      if (!isStaff(interaction.member, guildId)) {
+        return interaction.reply({ content: '❌ Not staff.', ephemeral: true });
+      }
 
       const duration = Math.floor((Date.now() - activeSession.startTime) / 60000);
 
@@ -124,6 +179,7 @@ client.on('interactionCreate', async interaction => {
         .setColor('Red');
 
       activeSession = null;
+
       return interaction.update({ embeds: [embed], components: [] });
     }
   }
@@ -145,12 +201,18 @@ client.on('interactionCreate', async interaction => {
     return interaction.reply({ content: '✅ Configuration saved.', ephemeral: true });
   }
 
-  // 🟢 SESSION START
+  // 🟢 SESSION
   if (interaction.commandName === 'session') {
     const sub = interaction.options.getSubcommand();
 
     if (sub === 'start') {
-      if (!isStaff(interaction.member, guildId)) return interaction.reply({ content: '❌ Not staff.', ephemeral: true });
+      if (!isStaff(interaction.member, guildId)) {
+        return interaction.reply({ content: '❌ Not staff.', ephemeral: true });
+      }
+
+      if (activeSession) {
+        return interaction.reply({ content: '⚠️ Session already active.', ephemeral: true });
+      }
 
       const code = interaction.options.getString('code');
 
@@ -186,6 +248,10 @@ client.on('interactionCreate', async interaction => {
     if (sub === 'end') {
       if (!isStaff(interaction.member, guildId)) return;
 
+      if (!activeSession) {
+        return interaction.reply({ content: '⚠️ No active session.', ephemeral: true });
+      }
+
       const duration = Math.floor((Date.now() - activeSession.startTime) / 60000);
 
       const embed = new EmbedBuilder()
@@ -197,6 +263,7 @@ client.on('interactionCreate', async interaction => {
         .setColor('Red');
 
       activeSession = null;
+
       return interaction.reply({ embeds: [embed] });
     }
   }
@@ -213,8 +280,12 @@ client.on('interactionCreate', async interaction => {
     const member = await interaction.guild.members.fetch(user.id);
     await member.ban({ reason });
 
-    const log = new EmbedBuilder().setTitle('User Banned').setDescription(`${user.tag}\nReason: ${reason}`).setColor('Red');
-    sendLog(interaction.guild, log);
+    sendLog(interaction.guild,
+      new EmbedBuilder()
+        .setTitle('User Banned')
+        .setDescription(`${user.tag}\nReason: ${reason}`)
+        .setColor('Red')
+    );
 
     return interaction.reply(`🔨 Banned ${user.tag}`);
   }
@@ -223,8 +294,12 @@ client.on('interactionCreate', async interaction => {
     const member = await interaction.guild.members.fetch(user.id);
     await member.kick(reason);
 
-    const log = new EmbedBuilder().setTitle('User Kicked').setDescription(`${user.tag}\nReason: ${reason}`).setColor('Orange');
-    sendLog(interaction.guild, log);
+    sendLog(interaction.guild,
+      new EmbedBuilder()
+        .setTitle('User Kicked')
+        .setDescription(`${user.tag}\nReason: ${reason}`)
+        .setColor('Orange')
+    );
 
     return interaction.reply(`🦶 Kicked ${user.tag}`);
   }
@@ -235,15 +310,23 @@ client.on('interactionCreate', async interaction => {
 
     await member.timeout(minutes * 60000);
 
-    const log = new EmbedBuilder().setTitle('User Timed Out').setDescription(`${user.tag} for ${minutes} min`).setColor('Yellow');
-    sendLog(interaction.guild, log);
+    sendLog(interaction.guild,
+      new EmbedBuilder()
+        .setTitle('User Timed Out')
+        .setDescription(`${user.tag} for ${minutes} minutes`)
+        .setColor('Yellow')
+    );
 
     return interaction.reply(`🔇 Timed out ${user.tag}`);
   }
 
   if (interaction.commandName === 'warn') {
-    const log = new EmbedBuilder().setTitle('User Warned').setDescription(`${user.tag}\nReason: ${reason}`).setColor('Blue');
-    sendLog(interaction.guild, log);
+    sendLog(interaction.guild,
+      new EmbedBuilder()
+        .setTitle('User Warned')
+        .setDescription(`${user.tag}\nReason: ${reason}`)
+        .setColor('Blue')
+    );
 
     return interaction.reply(`⚠️ Warned ${user.tag}`);
   }
