@@ -63,9 +63,11 @@ client.on('interactionCreate', async interaction => {
           { name: 'Code', value: code, inline: true }
         );
 
-      await interaction.reply({ content: '@Session Ping', embeds: [embed] });
-    }
-
+   await interaction.reply({
+  content: '@everyone',
+  embeds: [embed],
+  allowedMentions: { parse: ['everyone'] }
+});
     if (sub === 'end') {
       if (!activeSession) {
         return interaction.reply({ content: 'No active session.', ephemeral: true });
