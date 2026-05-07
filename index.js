@@ -1,3 +1,6 @@
+# Full Reconstructed ERLC Discord Bot Code
+
+```js
 const {
   Client,
   GatewayIntentBits,
@@ -5,6 +8,9 @@ const {
   SlashCommandBuilder,
   REST,
   Routes,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
   PermissionsBitField
 } = require('discord.js');
 
@@ -20,14 +26,21 @@ const client = new Client({
   ]
 });
 
-// ================= DATABASE =================
+let activeSession = null;
+
+// ================= LOAD FILES =================
 
 let config = fs.existsSync('./config.json')
   ? JSON.parse(fs.readFileSync('./config.json'))
   : {};
 
-function saveConfig() {
+let db = fs.existsSync('./database.json')
+  ? JSON.parse(fs.readFileSync('./database.json'))
+  : { warnings: {} };
+
+function saveAll() {
   fs.writeFileSync('./config.json', JSON.stringify(config, null, 2));
+  fs.writeFileSync('./database.json', JSON.stringify(db, null, 2));
 }
 
 function isStaff(member, guildId) {
@@ -41,6 +54,38 @@ function isStaff(member, guildId) {
 
 const commands = [
 
+  // SESSION
+  new SlashCommandBuilder()
+    .setName('session')
+    .setDescription('Manage sessions')
+    .addSubcommand(sub =>
+      sub
+        .setName('start')
+        .setDescription('Start session')
+        .addStringOption(option =>
+          option
+            .setName('code')
+            .setDescription('Server code')
+            .setRequired(true)
+        )
+    )
+    .addSubcommand(sub =>
+      sub
+        .setName('end')
+        .setDescription('End session')
+    ),
+
+  // API KEY
+  new SlashCommandBuilder()
+    .setName('setapikey')
+    .setDescription('Set ERLC API key')
+    .addStringOption(option =>
+      option
+        .setName('key')
+        .setDescription('ERLC API key')
+        .setRequired(true)
+    ),
+
   // CONFIG
   new SlashCommandBuilder()
     .setName('configure')
@@ -49,272 +94,248 @@ const commands = [
       option
         .setName('staffrole')
         .setDescription('Staff role')
+    )
+    .addChannelOption(option =>
+      option
+        .setName('logchannel')
+        .setDescription('Log channel')
+    ),
+
+  // MODERATION
+  new SlashCommandBuilder()
+    .setName('ban')
+    .setDescription('Ban user')
+    .addUserOption(option =>
+      option
+        .setName('user')
+        .setDescription('User')
+        .setRequired(true)
+    )
+    .addStringOption(option =>
+      option
+        .setName('reason')
+        .setDescription('Reason')
+    ),
+
+  new SlashCommandBuilder()
+    .setName('kick')
+    .setDescription('Kick user')
+    .addUserOption(option =>
+      option
+        .setName('user')
+        .setDescription('User')
+        .setRequired(true)
+    )
+    .addStringOption(option =>
+      option
+        .setName('reason')
+        .setDescription('Reason')
+    ),
+
+  new SlashCommandBuilder()
+    .setName('timeout')
+    .setDescription('Timeout user')
+    .addUserOption(option =>
+      option
+        .setName('user')
+        .setDescription('User')
+        .setRequired(true)
+    )
+    .addIntegerOption(option =>
+      option
+        .setName('minutes')
+        .setDescription('Minutes')
         .setRequired(true)
     ),
 
-  // LOCK
+  new SlashCommandBuilder()
+    .setName('warn')
+    .setDescription('Warn user')
+    .addUserOption(option =>
+      option
+        .setName('user')
+        .setDescription('User')
+        .setRequired(true)
+    )
+    .addStringOption(option =>
+      option
+        .setName('reason')
+        .setDescription('Reason')
+    ),
+
+  // PROMOTION
+  new SlashCommandBuilder()
+    .setName('promotion')
+    .setDescription('Promote a staff member')
+    .addUserOption(option =>
+      option
+        .setName('user')
+        .setDescription('User')
+        .setRequired(true)
+    )
+    .addStringOption(option =>
+      option
+        .setName('rank')
+        .setDescription('New rank')
+        .setRequired(true)
+    ),
+
+  // INFRACTION
+  new SlashCommandBuilder()
+    .setName('infraction')
+    .setDescription('Issue an infraction')
+    .addUserOption(option =>
+      option
+        .setName('user')
+        .setDescription('User')
+        .setRequired(true)
+    )
+    .addStringOption(option =>
+      option
+        .setName('reason')
+        .setDescription('Reason')
+        .setRequired(true)
+    ),
+
+  // UTILITY
+  new SlashCommandBuilder()
+    .setName('clear')
+    .setDescription('Clear messages')
+    .addIntegerOption(option =>
+      option
+        .setName('amount')
+        .setDescription('Amount')
+        .setRequired(true)
+    ),
+
   new SlashCommandBuilder()
     .setName('lock')
     .setDescription('Lock current channel'),
 
-  // UNLOCK
   new SlashCommandBuilder()
     .setName('unlock')
     .setDescription('Unlock current channel'),
 
-  // LOCKDOWN
   new SlashCommandBuilder()
     .setName('lockdown')
     .setDescription('Lock all server channels'),
 
-  // UNLOCKDOWN
   new SlashCommandBuilder()
     .setName('unlockdown')
-    .setDescription('Unlock all server channels')
+    .setDescription('Unlock all server channels'),
+
+  new SlashCommandBuilder()
+    .setName('slowmode')
+    .setDescription('Set slowmode')
+    .addIntegerOption(option =>
+      option
+        .setName('seconds')
+        .setDescription('Seconds')
+        .setRequired(true)
+    ),
+
+  new SlashCommandBuilder()
+    .setName('say')
+    .setDescription('Bot says message')
+    .addStringOption(option =>
+      option
+        .setName('message')
+        .setDescription('Message')
+        .setRequired(true)
+    ),
+
+  // TICKETS
+  new SlashCommandBuilder()
+    .setName('ticket')
+    .setDescription('Create ticket'),
+
+  new SlashCommandBuilder()
+    .setName('close')
+    .setDescription('Close ticket')
 
 ];
 
-// ================= REGISTER COMMANDS =================
+// ================= REGISTER =================
 
 const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
 
 (async () => {
-
   try {
-
-    console.log('Registering commands...');
+    console.log('Registering slash commands...');
 
     await rest.put(
       Routes.applicationCommands('1497762509380255865'),
-      {
-        body: commands.map(cmd => cmd.toJSON())
-      }
+      { body: commands.map(c => c.toJSON()) }
     );
 
     console.log('Commands registered.');
-
   } catch (err) {
-
     console.error(err);
-
   }
-
 })();
 
 // ================= READY =================
 
 client.once('ready', () => {
-
-  console.log(`✅ Logged in as ${client.user.tag}`);
-
+  console.log(`Logged in as ${client.user.tag}`);
 });
 
-// ================= INTERACTIONS =================
+// ================= AUTO MOD =================
 
-client.on('interactionCreate', async interaction => {
+client.on('messageCreate', async message => {
 
-  if (!interaction.isChatInputCommand()) return;
+  if (message.author.bot) return;
 
-  const guildId = interaction.guild.id;
-
-  if (!config[guildId]) {
-    config[guildId] = {};
+  // HI RESPONSE
+  if (message.content.toLowerCase() === 'hi') {
+    message.channel.send('Hello!');
   }
 
-  // ================= CONFIGURE =================
-
-  if (interaction.commandName === 'configure') {
-
-    if (
-      !interaction.member.permissions.has(
-        PermissionsBitField.Flags.Administrator
-      )
-    ) {
-      return interaction.reply({
-        content: '❌ Admin only.',
-        ephemeral: true
-      });
-    }
-
-    const role = interaction.options.getRole('staffrole');
-
-    config[guildId].staffRole = role.id;
-
-    saveConfig();
-
-    return interaction.reply({
-      content: '✅ Staff role configured.',
-      ephemeral: true
-    });
+  // LINK BLOCKER
+  if (message.content.includes('http')) {
+    await message.delete().catch(() => {});
+    return message.channel.send('🚫 Links are not allowed.');
   }
-
-  // ================= STAFF CHECK =================
-
-  if (!isStaff(interaction.member, guildId)) {
-
-    return interaction.reply({
-      content: '❌ Not staff.',
-      ephemeral: true
-    });
-
-  }
-
-  // ================= LOCK =================
-
-  if (interaction.commandName === 'lock') {
-
-    await interaction.channel.permissionOverwrites.edit(
-      interaction.guild.roles.everyone,
-      {
-        SendMessages: false
-      }
-    );
-
-    const embed = new EmbedBuilder()
-      .setColor('#ef4444')
-      .setTitle('🔒 Channel Locked')
-      .setDescription(
-        `This channel has been locked by ${interaction.user.tag}`
-      )
-      .setTimestamp();
-
-    return interaction.reply({
-      embeds: [embed]
-    });
-  }
-
-  // ================= UNLOCK =================
-
-  if (interaction.commandName === 'unlock') {
-
-    await interaction.channel.permissionOverwrites.edit(
-      interaction.guild.roles.everyone,
-      {
-        SendMessages: true
-      }
-    );
-
-    const embed = new EmbedBuilder()
-      .setColor('#22c55e')
-      .setTitle('🔓 Channel Unlocked')
-      .setDescription(
-        `This channel has been unlocked by ${interaction.user.tag}`
-      )
-      .setTimestamp();
-
-    return interaction.reply({
-      embeds: [embed]
-    });
-  }
-
-  // ================= LOCKDOWN =================
-
-  if (interaction.commandName === 'lockdown') {
-
-    await interaction.deferReply();
-
-    let locked = 0;
-
-    for (const channel of interaction.guild.channels.cache.values()) {
-
-      try {
-
-        await channel.permissionOverwrites.edit(
-          interaction.guild.roles.everyone,
-          {
-            SendMessages: false
-          }
-        );
-
-        locked++;
-
-      } catch (err) {
-
-        console.log(`Failed to lock ${channel.name}`);
-
-      }
-    }
-
-    const embed = new EmbedBuilder()
-      .setColor('#ef4444')
-      .setTitle('🚨 SERVER LOCKDOWN')
-      .setDescription(
-        'All server channels have been locked.'
-      )
-      .addFields(
-        {
-          name: 'Locked By',
-          value: interaction.user.tag,
-          inline: true
-        },
-        {
-          name: 'Channels Locked',
-          value: `${locked}`,
-          inline: true
-        }
-      )
-      .setTimestamp();
-
-    return interaction.editReply({
-      embeds: [embed]
-    });
-  }
-
-  // ================= UNLOCKDOWN =================
-
-  if (interaction.commandName === 'unlockdown') {
-
-    await interaction.deferReply();
-
-    let unlocked = 0;
-
-    for (const channel of interaction.guild.channels.cache.values()) {
-
-      try {
-
-        await channel.permissionOverwrites.edit(
-          interaction.guild.roles.everyone,
-          {
-            SendMessages: true
-          }
-        );
-
-        unlocked++;
-
-      } catch (err) {
-
-        console.log(`Failed to unlock ${channel.name}`);
-
-      }
-    }
-
-    const embed = new EmbedBuilder()
-      .setColor('#22c55e')
-      .setTitle('✅ SERVER UNLOCKED')
-      .setDescription(
-        'All server channels have been unlocked.'
-      )
-      .addFields(
-        {
-          name: 'Unlocked By',
-          value: interaction.user.tag,
-          inline: true
-        },
-        {
-          name: 'Channels Unlocked',
-          value: `${unlocked}`,
-          inline: true
-        }
-      )
-      .setTimestamp();
-
-    return interaction.editReply({
-      embeds: [embed]
-    });
-  }
-
 });
 
 // ================= LOGIN =================
 
 client.login(process.env.TOKEN);
+```
+
+# package.json
+
+```json
+{
+  "name": "erlc-bot",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.15.3",
+    "dotenv": "^16.4.5"
+  }
+}
+```
+
+# .env
+
+```env
+TOKEN=YOUR_BOT_TOKEN
+```
+
+# config.json
+
+```json
+{}
+```
+
+# database.json
+
+```json
+{
+  "warnings": {}
+}
+```
