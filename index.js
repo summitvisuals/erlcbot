@@ -1,4 +1,3 @@
-# Full Reconstructed ERLC Discord Bot Code
 
 ```js
 const {
