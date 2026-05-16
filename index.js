@@ -262,7 +262,7 @@ const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
     console.log('Registering slash commands...');
 
     await rest.put(
-      Routes.applicationCommands('1497762509380255865'),
+      Routes.applicationCommands('1505056547766534165'),
       { body: commands.map(c => c.toJSON()) }
     );
 
