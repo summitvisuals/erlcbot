@@ -6,7 +6,7 @@ const {
   REST,
   Routes,
   ActionRowBuilder,
-  StringSelectMenuBuilder,
+  StringSelectMenuBuilder, ]
   PermissionsBitField,
   ChannelType
 } = require('discord.js');
