@@ -8,6 +8,7 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  StringSelectMenuBuilder,
   PermissionsBitField,
   ChannelType
 } = require('discord.js');
@@ -53,32 +54,16 @@ function isStaff(member, guildId) {
 const commands = [
 
   new SlashCommandBuilder()
-    .setName('session')
-    .setDescription('Manage sessions')
-    .addSubcommand(sub =>
-      sub
-        .setName('start')
-        .setDescription('Start session')
-        .addStringOption(option =>
-          option
-            .setName('code')
-            .setDescription('Server code')
-            .setRequired(true)
-        )
-    )
-    .addSubcommand(sub =>
-      sub
-        .setName('end')
-        .setDescription('End session')
-    ),
+    .setName('panel')
+    .setDescription('Send support panel'),
 
   new SlashCommandBuilder()
-    .setName('setapikey')
-    .setDescription('Set ERLC API key')
+    .setName('say')
+    .setDescription('Bot says message')
     .addStringOption(option =>
       option
-        .setName('key')
-        .setDescription('ERLC API key')
+        .setName('message')
+        .setDescription('Message')
         .setRequired(true)
     ),
 
@@ -100,164 +85,14 @@ const commands = [
         .setName('ticketrole')
         .setDescription('Ticket support role')
     )
-    .addChannelOption(option =>
-      option
-        .setName('logchannel')
-        .setDescription('Log channel')
-    ),
-
-  new SlashCommandBuilder()
-    .setName('panel')
-    .setDescription('Send ticket panel'),
-
-  new SlashCommandBuilder()
-    .setName('ban')
-    .setDescription('Ban user')
-    .addUserOption(option =>
-      option
-        .setName('user')
-        .setDescription('User')
-        .setRequired(true)
-    )
-    .addStringOption(option =>
-      option
-        .setName('reason')
-        .setDescription('Reason')
-    ),
-
-  new SlashCommandBuilder()
-    .setName('kick')
-    .setDescription('Kick user')
-    .addUserOption(option =>
-      option
-        .setName('user')
-        .setDescription('User')
-        .setRequired(true)
-    )
-    .addStringOption(option =>
-      option
-        .setName('reason')
-        .setDescription('Reason')
-    ),
-
-  new SlashCommandBuilder()
-    .setName('timeout')
-    .setDescription('Timeout user')
-    .addUserOption(option =>
-      option
-        .setName('user')
-        .setDescription('User')
-        .setRequired(true)
-    )
-    .addIntegerOption(option =>
-      option
-        .setName('minutes')
-        .setDescription('Minutes')
-        .setRequired(true)
-    ),
-
-  new SlashCommandBuilder()
-    .setName('warn')
-    .setDescription('Warn user')
-    .addUserOption(option =>
-      option
-        .setName('user')
-        .setDescription('User')
-        .setRequired(true)
-    )
-    .addStringOption(option =>
-      option
-        .setName('reason')
-        .setDescription('Reason')
-    ),
-
-  new SlashCommandBuilder()
-    .setName('promotion')
-    .setDescription('Promote a staff member')
-    .addUserOption(option =>
-      option
-        .setName('user')
-        .setDescription('User')
-        .setRequired(true)
-    )
-    .addStringOption(option =>
-      option
-        .setName('rank')
-        .setDescription('New rank')
-        .setRequired(true)
-    ),
-
-  new SlashCommandBuilder()
-    .setName('infraction')
-    .setDescription('Issue an infraction')
-    .addUserOption(option =>
-      option
-        .setName('user')
-        .setDescription('User')
-        .setRequired(true)
-    )
-    .addStringOption(option =>
-      option
-        .setName('reason')
-        .setDescription('Reason')
-        .setRequired(true)
-    ),
-
-  new SlashCommandBuilder()
-    .setName('clear')
-    .setDescription('Clear messages')
-    .addIntegerOption(option =>
-      option
-        .setName('amount')
-        .setDescription('Amount')
-        .setRequired(true)
-    ),
-
-  new SlashCommandBuilder()
-    .setName('lock')
-    .setDescription('Lock current channel'),
-
-  new SlashCommandBuilder()
-    .setName('unlock')
-    .setDescription('Unlock current channel'),
-
-  new SlashCommandBuilder()
-    .setName('lockdown')
-    .setDescription('Lock all server channels'),
-
-  new SlashCommandBuilder()
-    .setName('unlockdown')
-    .setDescription('Unlock all server channels'),
-
-  new SlashCommandBuilder()
-    .setName('slowmode')
-    .setDescription('Set slowmode')
-    .addIntegerOption(option =>
-      option
-        .setName('seconds')
-        .setDescription('Seconds')
-        .setRequired(true)
-    ),
-
-  new SlashCommandBuilder()
-    .setName('say')
-    .setDescription('Bot says message')
-    .addStringOption(option =>
-      option
-        .setName('message')
-        .setDescription('Message')
-        .setRequired(true)
-    ),
-
-  new SlashCommandBuilder()
-    .setName('close')
-    .setDescription('Close ticket')
-
 ];
+
+// ================= REGISTER =================
 
 const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
 
 (async () => {
+
   try {
 
     console.log('Registering slash commands...');
@@ -272,26 +107,13 @@ const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
   } catch (err) {
     console.error(err);
   }
+
 })();
+
+// ================= READY =================
 
 client.once('ready', () => {
   console.log(`Logged in as ${client.user.tag}`);
-});
-
-// ================= AUTO MOD =================
-
-client.on('messageCreate', async message => {
-
-  if (message.author.bot) return;
-
-  if (message.content.toLowerCase() === 'hi') {
-    return message.channel.send('Hello!');
-  }
-
-  if (message.content.includes('http')) {
-    await message.delete().catch(() => {});
-    return message.channel.send('🚫 Links are not allowed.');
-  }
 });
 
 // ================= INTERACTIONS =================
@@ -306,14 +128,16 @@ client.on('interactionCreate', async interaction => {
     config[guildId] = {};
   }
 
-  // ================= BUTTONS =================
+  // ================= DROPDOWN MENU =================
 
-  if (interaction.isButton()) {
+  if (interaction.isStringSelectMenu()) {
 
-    if (interaction.customId === 'create_ticket') {
+    if (interaction.customId === 'ticket_select') {
+
+      const type = interaction.values[0];
 
       const existing = interaction.guild.channels.cache.find(
-        c => c.name === `ticket-${interaction.user.username.toLowerCase()}`
+        c => c.name === `${type}-${interaction.user.username.toLowerCase()}`
       );
 
       if (existing) {
@@ -323,8 +147,22 @@ client.on('interactionCreate', async interaction => {
         });
       }
 
+      let ticketName = type;
+
+      if (type === 'internal-affairs') {
+        ticketName = 'ia-ticket';
+      }
+
+      if (type === 'management') {
+        ticketName = 'management-ticket';
+      }
+
+      if (type === 'owner') {
+        ticketName = 'owner-ticket';
+      }
+
       const ticketChannel = await interaction.guild.channels.create({
-        name: `ticket-${interaction.user.username}`,
+        name: `${ticketName}-${interaction.user.username}`,
         type: ChannelType.GuildText,
         permissionOverwrites: [
           {
@@ -350,10 +188,14 @@ client.on('interactionCreate', async interaction => {
 
       const embed = new EmbedBuilder()
         .setColor('#3b82f6')
-        .setTitle('🎟️ Support Ticket')
-        .setDescription(
-          `Welcome ${interaction.user}\n\nPlease explain your issue and a Sydney City Roleplay staff member will assist you shortly.`
-        )
+        .setTitle('🎫 Sydney City Roleplay Support')
+        .setDescription(`
+Welcome ${interaction.user}
+
+Your support ticket has been opened.
+
+Please explain your issue and a staff member will assist you shortly.
+`)
         .setFooter({
           text: 'Sydney City Roleplay'
         })
@@ -362,7 +204,7 @@ client.on('interactionCreate', async interaction => {
       await ticketChannel.send({
         content: config[guildId].ticketRole
           ? `<@&${config[guildId].ticketRole}>`
-          : 'Staff Team',
+          : '@here',
         embeds: [embed]
       });
 
@@ -371,31 +213,13 @@ client.on('interactionCreate', async interaction => {
         ephemeral: true
       });
     }
-
-    if (interaction.customId === 'copy_code') {
-
-      return interaction.reply({
-        content: `🔑 Server Code: ${activeSession?.code || 'No Active Session'}`,
-        ephemeral: true
-      });
-    }
-
-    if (interaction.customId === 'session_ping') {
-
-      return interaction.reply({
-        content: '@everyone 🚨 Session is active!',
-        allowedMentions: {
-          parse: ['everyone']
-        }
-      });
-    }
   }
 
   // ================= CHAT COMMANDS =================
 
   if (!interaction.isChatInputCommand()) return;
 
-  // ================= CONFIG =================
+  // ================= CONFIGURE =================
 
   if (interaction.commandName === 'configure') {
 
@@ -409,12 +233,10 @@ client.on('interactionCreate', async interaction => {
     const staffRole = interaction.options.getRole('staffrole');
     const ownerRole = interaction.options.getRole('ownerrole');
     const ticketRole = interaction.options.getRole('ticketrole');
-    const logChannel = interaction.options.getChannel('logchannel');
 
     if (staffRole) config[guildId].staffRole = staffRole.id;
     if (ownerRole) config[guildId].ownerRole = ownerRole.id;
     if (ticketRole) config[guildId].ticketRole = ticketRole.id;
-    if (logChannel) config[guildId].logChannel = logChannel.id;
 
     saveAll();
 
@@ -441,20 +263,61 @@ client.on('interactionCreate', async interaction => {
     const embed = new EmbedBuilder()
       .setColor('#3b82f6')
       .setTitle('🎫 Sydney City Roleplay Support')
-      .setDescription(
-        'Need assistance?\n\nClick the button below to contact Sydney City Roleplay Staff.'
-      )
+      .setDescription(`
+G'day! do you need support? Well, look no more, here it is.
+
+**General Support**  
+General Inquiries, Questions & Reporting Members
+
+-----------------------------------------------------------------------------------
+
+**Internal Affairs Support**  
+Reporting Staff & Inquiries
+
+-----------------------------------------------------------------------------------
+
+**Management Support**  
+Management Inquiries, HR reports, Partnerships & Claiming store items.
+
+-----------------------------------------------------------------------------------
+
+⚠️ If you make a fake or troll ticket you will face moderation.
+
+Our bot for tickets is TicketsV2. If you come across a problem with the ticket system, ping @O | CosmicDrifter.
+
+-----------------------------------------------------------------------------------
+`)
       .setFooter({
         text: 'Sydney City Roleplay'
       })
       .setTimestamp();
 
     const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId('create_ticket')
-        .setLabel('Open Ticket')
-        .setEmoji('🎟️')
-        .setStyle(ButtonStyle.Primary)
+      new StringSelectMenuBuilder()
+        .setCustomId('ticket_select')
+        .setPlaceholder('Select a support department')
+        .addOptions([
+          {
+            label: 'General Support',
+            description: 'General help and questions',
+            value: 'general'
+          },
+          {
+            label: 'Internal Affairs',
+            description: 'Report staff or IA inquiries',
+            value: 'internal-affairs'
+          },
+          {
+            label: 'Management Support',
+            description: 'Management and HR support',
+            value: 'management'
+          },
+          {
+            label: 'Owner Support',
+            description: 'Direct owner assistance',
+            value: 'owner'
+          }
+        ])
     );
 
     return interaction.reply({
@@ -463,82 +326,31 @@ client.on('interactionCreate', async interaction => {
     });
   }
 
-  // ================= SESSION =================
+  // ================= SAY =================
 
-  if (interaction.commandName === 'session') {
+  if (interaction.commandName === 'say') {
 
-    const sub = interaction.options.getSubcommand();
-
-    if (sub === 'start') {
-
-      if (!isStaff(interaction.member, guildId)) {
-        return interaction.reply({
-          content: '❌ Not staff.',
-          ephemeral: true
-        });
-      }
-
-      const code = interaction.options.getString('code');
-
-      activeSession = {
-        host: interaction.user.username,
-        code,
-        startTime: Date.now()
-      };
-
-      const embed = new EmbedBuilder()
-        .setColor('#3b82f6')
-        .setTitle('🚓 Sydney City Roleplay Session Started')
-        .setDescription(`Hosted by ${interaction.user}`)
-        .addFields(
-          {
-            name: '🔑 Join Code',
-            value: `\`${code}\``,
-            inline: true
-          },
-          {
-            name: '🕒 Started',
-            value: `<t:${Math.floor(Date.now() / 1000)}:R>`,
-            inline: true
-          }
-        )
-        .setFooter({
-          text: 'Sydney City Roleplay'
-        })
-        .setTimestamp();
-
-      const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setCustomId('copy_code')
-          .setLabel('Copy Code')
-          .setStyle(ButtonStyle.Primary),
-
-        new ButtonBuilder()
-          .setCustomId('session_ping')
-          .setLabel('Ping')
-          .setStyle(ButtonStyle.Success)
-      );
-
+    if (!isStaff(interaction.member, guildId)) {
       return interaction.reply({
-        content: '@everyone',
-        embeds: [embed],
-        components: [row],
-        allowedMentions: {
-          parse: ['everyone']
-        }
+        content: '❌ Not staff.',
+        ephemeral: true
       });
     }
 
-    if (sub === 'end') {
+    const msg = interaction.options.getString('message');
 
-      activeSession = null;
+    await interaction.channel.send({
+      content: msg
+    });
 
-      return interaction.reply({
-        content: '🔴 Session ended.'
-      });
-    }
+    return interaction.reply({
+      content: '✅ Message sent.',
+      ephemeral: true
+    });
   }
 
 });
+
+// ================= LOGIN =================
 
 client.login(process.env.TOKEN);
