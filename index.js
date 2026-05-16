@@ -4,10 +4,11 @@ const {
   EmbedBuilder,
   SlashCommandBuilder,
   REST,
-  Routes,
+ Routes,
   ActionRowBuilder,
-  StringSelectMenuBuilder, ]
+  StringSelectMenuBuilder,
   PermissionsBitField,
+  PermissionFlagsBits,
   ChannelType
 } = require('discord.js');
 
@@ -25,7 +26,7 @@ const client = new Client({
 
 let activeSession = null;
 
-// ================= LOAD FILES =================
+// ================= FILES =================
 
 let config = fs.existsSync('./config.json')
   ? JSON.parse(fs.readFileSync('./config.json'))
@@ -51,13 +52,16 @@ function isStaff(member, guildId) {
 
 const commands = [
 
+  // PANEL
   new SlashCommandBuilder()
     .setName('panel')
     .setDescription('Send support panel'),
 
+  // CONFIGURE
   new SlashCommandBuilder()
     .setName('configure')
     .setDescription('Configure bot')
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addRoleOption(option =>
       option.setName('staffrole').setDescription('Staff role')
     )
@@ -68,6 +72,7 @@ const commands = [
       option.setName('ticketrole').setDescription('Ticket role')
     ),
 
+  // SAY
   new SlashCommandBuilder()
     .setName('say')
     .setDescription('Bot says message')
@@ -78,6 +83,7 @@ const commands = [
         .setRequired(true)
     ),
 
+  // SESSION
   new SlashCommandBuilder()
     .setName('session')
     .setDescription('Manage sessions')
@@ -98,6 +104,7 @@ const commands = [
         .setDescription('End session')
     ),
 
+  // BAN
   new SlashCommandBuilder()
     .setName('ban')
     .setDescription('Ban user')
@@ -113,6 +120,7 @@ const commands = [
         .setDescription('Reason')
     ),
 
+  // KICK
   new SlashCommandBuilder()
     .setName('kick')
     .setDescription('Kick user')
@@ -128,6 +136,7 @@ const commands = [
         .setDescription('Reason')
     ),
 
+  // TIMEOUT
   new SlashCommandBuilder()
     .setName('timeout')
     .setDescription('Timeout user')
@@ -144,6 +153,7 @@ const commands = [
         .setRequired(true)
     ),
 
+  // WARN
   new SlashCommandBuilder()
     .setName('warn')
     .setDescription('Warn user')
@@ -159,9 +169,10 @@ const commands = [
         .setDescription('Reason')
     ),
 
+  // PROMOTION
   new SlashCommandBuilder()
     .setName('promotion')
-    .setDescription('Promote a staff member')
+    .setDescription('Promote staff member')
     .addUserOption(option =>
       option
         .setName('user')
@@ -171,13 +182,14 @@ const commands = [
     .addStringOption(option =>
       option
         .setName('rank')
-        .setDescription('Rank')
+        .setDescription('New rank')
         .setRequired(true)
     ),
 
+  // INFRACTION
   new SlashCommandBuilder()
     .setName('infraction')
-    .setDescription('Issue a staff infraction')
+    .setDescription('Issue staff infraction')
     .addUserOption(option =>
       option
         .setName('user')
@@ -197,6 +209,7 @@ const commands = [
         .setRequired(true)
     ),
 
+  // CLEAR
   new SlashCommandBuilder()
     .setName('clear')
     .setDescription('Clear messages')
@@ -207,22 +220,27 @@ const commands = [
         .setRequired(true)
     ),
 
+  // LOCK
   new SlashCommandBuilder()
     .setName('lock')
     .setDescription('Lock channel'),
 
+  // UNLOCK
   new SlashCommandBuilder()
     .setName('unlock')
     .setDescription('Unlock channel'),
 
+  // LOCKDOWN
   new SlashCommandBuilder()
     .setName('lockdown')
     .setDescription('Lock all channels'),
 
+  // UNLOCKDOWN
   new SlashCommandBuilder()
     .setName('unlockdown')
     .setDescription('Unlock all channels'),
 
+  // SLOWMODE
   new SlashCommandBuilder()
     .setName('slowmode')
     .setDescription('Set slowmode')
@@ -233,6 +251,7 @@ const commands = [
         .setRequired(true)
     ),
 
+  // CLOSE
   new SlashCommandBuilder()
     .setName('close')
     .setDescription('Close ticket')
@@ -249,7 +268,7 @@ const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
     console.log('Registering slash commands...');
 
     await rest.put(
-      Routes.applicationCommands('1505056547766534165'),
+      Routes.applicationCommands(process.env.CLIENT_ID),
       { body: commands.map(c => c.toJSON()) }
     );
 
@@ -341,16 +360,8 @@ Please explain your issue and staff will assist you shortly.
 
   try {
 
-    // ================= CONFIGURE =================
-
+    // CONFIGURE
     if (interaction.commandName === 'configure') {
-
-      if (!interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-        return interaction.reply({
-          content: '❌ Admin only.',
-          ephemeral: true
-        });
-      }
 
       const staffRole = interaction.options.getRole('staffrole');
       const ownerRole = interaction.options.getRole('ownerrole');
@@ -368,8 +379,7 @@ Please explain your issue and staff will assist you shortly.
       });
     }
 
-    // ================= PANEL =================
-
+    // PANEL
     if (interaction.commandName === 'panel') {
 
       const embed = new EmbedBuilder()
@@ -429,8 +439,7 @@ Management Inquiries, HR reports, Partnerships & Claiming store items.
       });
     }
 
-    // ================= STAFF CHECK =================
-
+    // STAFF CHECK
     if (!isStaff(interaction.member, guildId)) {
       return interaction.reply({
         content: '❌ Not staff.',
@@ -438,8 +447,7 @@ Management Inquiries, HR reports, Partnerships & Claiming store items.
       });
     }
 
-    // ================= SAY =================
-
+    // SAY
     if (interaction.commandName === 'say') {
 
       const msg = interaction.options.getString('message');
@@ -452,8 +460,7 @@ Management Inquiries, HR reports, Partnerships & Claiming store items.
       });
     }
 
-    // ================= SESSION =================
-
+    // SESSION
     if (interaction.commandName === 'session') {
 
       const sub = interaction.options.getSubcommand();
@@ -495,8 +502,7 @@ Management Inquiries, HR reports, Partnerships & Claiming store items.
       }
     }
 
-    // ================= BAN =================
-
+    // BAN
     if (interaction.commandName === 'ban') {
 
       const user = interaction.options.getUser('user');
@@ -513,8 +519,7 @@ Management Inquiries, HR reports, Partnerships & Claiming store items.
       });
     }
 
-    // ================= KICK =================
-
+    // KICK
     if (interaction.commandName === 'kick') {
 
       const user = interaction.options.getUser('user');
@@ -531,8 +536,7 @@ Management Inquiries, HR reports, Partnerships & Claiming store items.
       });
     }
 
-    // ================= TIMEOUT =================
-
+    // TIMEOUT
     if (interaction.commandName === 'timeout') {
 
       const user = interaction.options.getUser('user');
@@ -549,8 +553,7 @@ Management Inquiries, HR reports, Partnerships & Claiming store items.
       });
     }
 
-    // ================= WARN =================
-
+    // WARN
     if (interaction.commandName === 'warn') {
 
       const user = interaction.options.getUser('user');
@@ -570,8 +573,7 @@ Management Inquiries, HR reports, Partnerships & Claiming store items.
       });
     }
 
-    // ================= PROMOTION =================
-
+    // PROMOTION
     if (interaction.commandName === 'promotion') {
 
       const user = interaction.options.getUser('user');
@@ -597,13 +599,12 @@ Management Inquiries, HR reports, Partnerships & Claiming store items.
       });
 
       return interaction.reply({
-        content: `✅ Promotion logged for ${user.tag}`,
+        content: `✅ Promotion logged.`,
         ephemeral: true
       });
     }
 
-    // ================= INFRACTION =================
-
+    // INFRACTION
     if (interaction.commandName === 'infraction') {
 
       const user = interaction.options.getUser('user');
@@ -647,13 +648,12 @@ Below you can find more relevant information on this infraction.
       });
 
       return interaction.reply({
-        content: `✅ Infraction issued to ${user.tag}`,
+        content: `✅ Infraction issued.`,
         ephemeral: true
       });
     }
 
-    // ================= CLEAR =================
-
+    // CLEAR
     if (interaction.commandName === 'clear') {
 
       const amount =
@@ -666,8 +666,7 @@ Below you can find more relevant information on this infraction.
       });
     }
 
-    // ================= LOCK =================
-
+    // LOCK
     if (interaction.commandName === 'lock') {
 
       await interaction.channel.permissionOverwrites.edit(
@@ -682,8 +681,7 @@ Below you can find more relevant information on this infraction.
       });
     }
 
-    // ================= UNLOCK =================
-
+    // UNLOCK
     if (interaction.commandName === 'unlock') {
 
       await interaction.channel.permissionOverwrites.edit(
@@ -698,8 +696,7 @@ Below you can find more relevant information on this infraction.
       });
     }
 
-    // ================= LOCKDOWN =================
-
+    // LOCKDOWN
     if (interaction.commandName === 'lockdown') {
 
       interaction.guild.channels.cache.forEach(async channel => {
@@ -720,8 +717,7 @@ Below you can find more relevant information on this infraction.
       });
     }
 
-    // ================= UNLOCKDOWN =================
-
+    // UNLOCKDOWN
     if (interaction.commandName === 'unlockdown') {
 
       interaction.guild.channels.cache.forEach(async channel => {
@@ -742,8 +738,7 @@ Below you can find more relevant information on this infraction.
       });
     }
 
-    // ================= SLOWMODE =================
-
+    // SLOWMODE
     if (interaction.commandName === 'slowmode') {
 
       const seconds =
@@ -756,8 +751,7 @@ Below you can find more relevant information on this infraction.
       });
     }
 
-    // ================= CLOSE =================
-
+    // CLOSE
     if (interaction.commandName === 'close') {
 
       await interaction.reply({
