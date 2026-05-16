@@ -93,11 +93,26 @@ const commands = [
         .setName('staffrole')
         .setDescription('Staff role')
     )
+    .addRoleOption(option =>
+      option
+        .setName('ownerrole')
+        .setDescription('Owner role')
+    )
+    .addRoleOption(option =>
+      option
+        .setName('ticketrole')
+        .setDescription('Ticket support role')
+    )
     .addChannelOption(option =>
       option
         .setName('logchannel')
         .setDescription('Log channel')
     ),
+
+  // TICKET PANEL
+  new SlashCommandBuilder()
+    .setName('panel')
+    .setDescription('Send ticket panel'),
 
   // MODERATION
   new SlashCommandBuilder()
@@ -244,10 +259,6 @@ const commands = [
 
   // TICKETS
   new SlashCommandBuilder()
-    .setName('ticket')
-    .setDescription('Create ticket'),
-
-  new SlashCommandBuilder()
     .setName('close')
     .setDescription('Close ticket')
 
@@ -284,12 +295,10 @@ client.on('messageCreate', async message => {
 
   if (message.author.bot) return;
 
-  // HI RESPONSE
   if (message.content.toLowerCase() === 'hi') {
     return message.channel.send('Hello!');
   }
 
-  // LINK BLOCKER
   if (message.content.includes('http')) {
     await message.delete().catch(() => {});
     return message.channel.send('🚫 Links are not allowed.');
@@ -300,13 +309,103 @@ client.on('messageCreate', async message => {
 
 client.on('interactionCreate', async interaction => {
 
-  if (!interaction.isChatInputCommand()) return;
-
   const guildId = interaction.guild.id;
 
   if (!config[guildId]) {
     config[guildId] = {};
   }
+
+  // ================= BUTTONS =================
+
+  if (interaction.isButton()) {
+
+    // CREATE TICKET
+    if (interaction.customId === 'create_ticket') {
+
+      const existing = interaction.guild.channels.cache.find(
+        c => c.name === `ticket-${interaction.user.username.toLowerCase()}`
+      );
+
+      if (existing) {
+        return interaction.reply({
+          content: `❌ You already have a ticket: ${existing}`,
+          ephemeral: true
+        });
+      }
+
+      const ticketChannel = await interaction.guild.channels.create({
+        name: `ticket-${interaction.user.username}`,
+        type: ChannelType.GuildText,
+        permissionOverwrites: [
+          {
+            id: interaction.guild.id,
+            deny: [PermissionsBitField.Flags.ViewChannel]
+          },
+          {
+            id: interaction.user.id,
+            allow: [
+              PermissionsBitField.Flags.ViewChannel,
+              PermissionsBitField.Flags.SendMessages
+            ]
+          },
+          {
+            id: config[guildId].ticketRole || interaction.guild.id,
+            allow: [
+              PermissionsBitField.Flags.ViewChannel,
+              PermissionsBitField.Flags.SendMessages
+            ]
+          }
+        ]
+      });
+
+      const embed = new EmbedBuilder()
+        .setColor('#3b82f6')
+        .setTitle('🎟️ Support Ticket')
+        .setDescription(
+          `Welcome ${interaction.user}\n\nPlease explain your issue and a staff member will assist you shortly.`
+        )
+        .setFooter({
+          text: 'Illinois State Roleplay'
+        })
+        .setTimestamp();
+
+      await ticketChannel.send({
+        content: config[guildId].ticketRole
+          ? `<@&${config[guildId].ticketRole}>`
+          : 'Staff Team',
+        embeds: [embed]
+      });
+
+      return interaction.reply({
+        content: `✅ Ticket created: ${ticketChannel}`,
+        ephemeral: true
+      });
+    }
+
+    // COPY CODE
+    if (interaction.customId === 'copy_code') {
+
+      return interaction.reply({
+        content: `🔑 Server Code: ${activeSession?.code || 'No Active Session'}`,
+        ephemeral: true
+      });
+    }
+
+    // SESSION PING
+    if (interaction.customId === 'session_ping') {
+
+      return interaction.reply({
+        content: '@everyone 🚨 Session is active!',
+        allowedMentions: {
+          parse: ['everyone']
+        }
+      });
+    }
+  }
+
+  // ================= CHAT COMMANDS =================
+
+  if (!interaction.isChatInputCommand()) return;
 
   // ================= SET API KEY =================
 
@@ -342,22 +441,71 @@ client.on('interactionCreate', async interaction => {
       });
     }
 
-    const role = interaction.options.getRole('staffrole');
-    const channel = interaction.options.getChannel('logchannel');
+    const staffRole = interaction.options.getRole('staffrole');
+    const ownerRole = interaction.options.getRole('ownerrole');
+    const ticketRole = interaction.options.getRole('ticketrole');
+    const logChannel = interaction.options.getChannel('logchannel');
 
-    if (role) {
-      config[guildId].staffRole = role.id;
+    if (staffRole) {
+      config[guildId].staffRole = staffRole.id;
     }
 
-    if (channel) {
-      config[guildId].logChannel = channel.id;
+    if (ownerRole) {
+      config[guildId].ownerRole = ownerRole.id;
+    }
+
+    if (ticketRole) {
+      config[guildId].ticketRole = ticketRole.id;
+    }
+
+    if (logChannel) {
+      config[guildId].logChannel = logChannel.id;
     }
 
     saveAll();
 
     return interaction.reply({
-      content: '✅ Config saved.',
+      content: '✅ Configuration saved.',
       ephemeral: true
+    });
+  }
+
+  // ================= PANEL =================
+
+  if (interaction.commandName === 'panel') {
+
+    if (
+      !config[guildId]?.ownerRole ||
+      !interaction.member.roles.cache.has(config[guildId].ownerRole)
+    ) {
+      return interaction.reply({
+        content: '❌ Owner role only.',
+        ephemeral: true
+      });
+    }
+
+    const embed = new EmbedBuilder()
+      .setColor('#3b82f6')
+      .setTitle('🎫 Support Tickets')
+      .setDescription(
+        'Need help?\n\nClick the button below to open a support ticket.'
+      )
+      .setFooter({
+        text: 'Illinois State Roleplay'
+      })
+      .setTimestamp();
+
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('create_ticket')
+        .setLabel('Open Ticket')
+        .setEmoji('🎟️')
+        .setStyle(ButtonStyle.Primary)
+    );
+
+    return interaction.reply({
+      embeds: [embed],
+      components: [row]
     });
   }
 
@@ -367,7 +515,6 @@ client.on('interactionCreate', async interaction => {
 
     const sub = interaction.options.getSubcommand();
 
-    // START SESSION
     if (sub === 'start') {
 
       if (!isStaff(interaction.member, guildId)) {
@@ -428,15 +575,7 @@ client.on('interactionCreate', async interaction => {
       });
     }
 
-    // END SESSION
     if (sub === 'end') {
-
-      if (!isStaff(interaction.member, guildId)) {
-        return interaction.reply({
-          content: '❌ Not staff.',
-          ephemeral: true
-        });
-      }
 
       activeSession = null;
 
@@ -549,10 +688,6 @@ client.on('interactionCreate', async interaction => {
         embeds: [embed]
       });
 
-      await user.send(
-        `🎉 You were promoted to **${rank}** in ${interaction.guild.name}!`
-      ).catch(() => {});
-
       return interaction.editReply(
         `✅ Promotion logged for ${user.tag}`
       );
@@ -581,10 +716,6 @@ client.on('interactionCreate', async interaction => {
       await interaction.channel.send({
         embeds: [embed]
       });
-
-      await user.send(
-        `⚠️ You received an infraction in ${interaction.guild.name}\nReason: ${reason}`
-      ).catch(() => {});
 
       return interaction.editReply(
         `✅ Infraction logged for ${user.tag}`
@@ -705,30 +836,6 @@ client.on('interactionCreate', async interaction => {
       await interaction.channel.send(msg);
 
       return interaction.editReply('✅ Sent');
-    }
-
-    // ================= TICKET =================
-
-    if (interaction.commandName === 'ticket') {
-
-      const ch = await interaction.guild.channels.create({
-        name: `ticket-${interaction.user.username}`,
-        type: ChannelType.GuildText,
-        permissionOverwrites: [
-          {
-            id: interaction.guild.id,
-            deny: ['ViewChannel']
-          },
-          {
-            id: interaction.user.id,
-            allow: ['ViewChannel', 'SendMessages']
-          }
-        ]
-      });
-
-      return interaction.editReply(
-        `🎟️ Ticket created: ${ch}`
-      );
     }
 
     // ================= CLOSE =================
