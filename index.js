@@ -343,7 +343,86 @@ client.on('interactionCreate', async interaction => {
           ephemeral: true
         });
       }
+// ================= BUTTONS =================
 
+if (interaction.isButton()) {
+
+  // CLAIM TICKET
+
+  if (interaction.customId === 'claim_ticket') {
+
+    await interaction.reply({
+      content: `📌 Ticket claimed by ${interaction.user}`,
+    });
+
+  }
+
+  // CLOSE TICKET
+
+  if (interaction.customId === 'close_ticket') {
+
+    await interaction.reply({
+      content: '🔒 Closing ticket in 5 seconds...'
+    });
+
+    const messages = await interaction.channel.messages.fetch({
+      limit: 100
+    });
+
+    const transcript = messages
+      .reverse()
+      .map(m => `${m.author.tag}: ${m.content}`)
+      .join('\n');
+
+    const fileName = `transcript-${interaction.channel.id}.txt`;
+
+    fs.writeFileSync(fileName, transcript);
+
+    if (config[guildId]?.logChannel) {
+
+      const logChannel =
+        interaction.guild.channels.cache.get(
+          config[guildId].logChannel
+        );
+
+      if (logChannel) {
+
+        const logEmbed = new EmbedBuilder()
+          .setColor('#3b82f6')
+          .setTitle('🎫 Ticket Closed')
+          .addFields(
+            {
+              name: 'Ticket',
+              value: interaction.channel.name
+            },
+            {
+              name: 'Closed By',
+              value: interaction.user.tag
+            }
+          )
+          .setTimestamp();
+
+        await logChannel.send({
+          embeds: [logEmbed],
+          files: [new AttachmentBuilder(fileName)]
+        });
+      }
+    }
+
+    await interaction.channel.send({
+      content:
+        '⭐ Please rate your support experience from 1-5 before this ticket closes.'
+    });
+
+    setTimeout(async () => {
+
+      await interaction.channel.delete().catch(() => {});
+
+      fs.unlinkSync(fileName);
+
+    }, 5000);
+  }
+}
       const ticketChannel = await interaction.guild.channels.create({
         name: `${type}-${interaction.user.username}`,
         type: ChannelType.GuildText,
