@@ -342,10 +342,15 @@ Please explain your issue and staff will assist you shortly.
         .setFooter({
           text: 'Sydney City Roleplay'
         });
-
-      await ticketChannel.send({
-        embeds: [embed]
-      });
+await ticketChannel.send({
+  content: config[guildId].ticketRole
+    ? `<@&${config[guildId].ticketRole}>`
+    : '@here',
+  embeds: [embed],
+  allowedMentions: {
+    parse: ['roles']
+  }
+});
 
       return interaction.reply({
         content: `✅ Ticket created: ${ticketChannel}`,
