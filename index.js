@@ -4,7 +4,7 @@ const {
   EmbedBuilder,
   SlashCommandBuilder,
   REST,
- Routes,
+  Routes,
   ActionRowBuilder,
   StringSelectMenuBuilder,
   PermissionsBitField,
@@ -254,7 +254,34 @@ const commands = [
   // CLOSE
   new SlashCommandBuilder()
     .setName('close')
-    .setDescription('Close ticket')
+    .setDescription('Close ticket'),
+
+  // CLAIM
+  new SlashCommandBuilder()
+    .setName('claim')
+    .setDescription('Claim ticket'),
+
+  // ADD
+  new SlashCommandBuilder()
+    .setName('add')
+    .setDescription('Add user to ticket')
+    .addUserOption(option =>
+      option
+        .setName('user')
+        .setDescription('User')
+        .setRequired(true)
+    ),
+
+  // REMOVE
+  new SlashCommandBuilder()
+    .setName('remove')
+    .setDescription('Remove user from ticket')
+    .addUserOption(option =>
+      option
+        .setName('user')
+        .setDescription('User')
+        .setRequired(true)
+    )
 ];
 
 // ================= REGISTER =================
@@ -306,6 +333,17 @@ client.on('interactionCreate', async interaction => {
 
       const type = interaction.values[0];
 
+      const existing = interaction.guild.channels.cache.find(
+        c => c.name === `${type}-${interaction.user.username.toLowerCase()}`
+      );
+
+      if (existing) {
+        return interaction.reply({
+          content: `❌ You already have a ticket: ${existing}`,
+          ephemeral: true
+        });
+      }
+
       const ticketChannel = await interaction.guild.channels.create({
         name: `${type}-${interaction.user.username}`,
         type: ChannelType.GuildText,
@@ -341,16 +379,18 @@ Please explain your issue and staff will assist you shortly.
 `)
         .setFooter({
           text: 'Sydney City Roleplay'
-        });
-await ticketChannel.send({
-  content: config[guildId].ticketRole
-    ? `<@&${config[guildId].ticketRole}>`
-    : '@here',
-  embeds: [embed],
-  allowedMentions: {
-    parse: ['roles']
-  }
-});
+        })
+        .setTimestamp();
+
+      await ticketChannel.send({
+        content: config[guildId].ticketRole
+          ? `<@&${config[guildId].ticketRole}>`
+          : '@here',
+        embeds: [embed],
+        allowedMentions: {
+          parse: ['roles']
+        }
+      });
 
       return interaction.reply({
         content: `✅ Ticket created: ${ticketChannel}`,
@@ -365,7 +405,8 @@ await ticketChannel.send({
 
   try {
 
-    // CONFIGURE
+    // ================= CONFIGURE =================
+
     if (interaction.commandName === 'configure') {
 
       const staffRole = interaction.options.getRole('staffrole');
@@ -384,7 +425,8 @@ await ticketChannel.send({
       });
     }
 
-    // PANEL
+    // ================= PANEL =================
+
     if (interaction.commandName === 'panel') {
 
       const embed = new EmbedBuilder()
@@ -444,7 +486,8 @@ Management Inquiries, HR reports, Partnerships & Claiming store items.
       });
     }
 
-    // STAFF CHECK
+    // ================= STAFF CHECK =================
+
     if (!isStaff(interaction.member, guildId)) {
       return interaction.reply({
         content: '❌ Not staff.',
@@ -452,20 +495,24 @@ Management Inquiries, HR reports, Partnerships & Claiming store items.
       });
     }
 
-    // SAY
+    // ================= SAY =================
+
     if (interaction.commandName === 'say') {
 
       const msg = interaction.options.getString('message');
 
-      await interaction.channel.send(msg);
+      await interaction.channel.send({
+        content: msg
+      });
 
       return interaction.reply({
-        content: '✅ Sent.',
+        content: '✅ Message sent.',
         ephemeral: true
       });
     }
 
-    // SESSION
+    // ================= SESSION =================
+
     if (interaction.commandName === 'session') {
 
       const sub = interaction.options.getSubcommand();
@@ -507,7 +554,8 @@ Management Inquiries, HR reports, Partnerships & Claiming store items.
       }
     }
 
-    // BAN
+    // ================= BAN =================
+
     if (interaction.commandName === 'ban') {
 
       const user = interaction.options.getUser('user');
@@ -524,7 +572,8 @@ Management Inquiries, HR reports, Partnerships & Claiming store items.
       });
     }
 
-    // KICK
+    // ================= KICK =================
+
     if (interaction.commandName === 'kick') {
 
       const user = interaction.options.getUser('user');
@@ -541,7 +590,8 @@ Management Inquiries, HR reports, Partnerships & Claiming store items.
       });
     }
 
-    // TIMEOUT
+    // ================= TIMEOUT =================
+
     if (interaction.commandName === 'timeout') {
 
       const user = interaction.options.getUser('user');
@@ -558,7 +608,8 @@ Management Inquiries, HR reports, Partnerships & Claiming store items.
       });
     }
 
-    // WARN
+    // ================= WARN =================
+
     if (interaction.commandName === 'warn') {
 
       const user = interaction.options.getUser('user');
@@ -578,7 +629,8 @@ Management Inquiries, HR reports, Partnerships & Claiming store items.
       });
     }
 
-    // PROMOTION
+    // ================= PROMOTION =================
+
     if (interaction.commandName === 'promotion') {
 
       const user = interaction.options.getUser('user');
@@ -609,7 +661,8 @@ Management Inquiries, HR reports, Partnerships & Claiming store items.
       });
     }
 
-    // INFRACTION
+    // ================= INFRACTION =================
+
     if (interaction.commandName === 'infraction') {
 
       const user = interaction.options.getUser('user');
@@ -658,7 +711,8 @@ Below you can find more relevant information on this infraction.
       });
     }
 
-    // CLEAR
+    // ================= CLEAR =================
+
     if (interaction.commandName === 'clear') {
 
       const amount =
@@ -671,7 +725,8 @@ Below you can find more relevant information on this infraction.
       });
     }
 
-    // LOCK
+    // ================= LOCK =================
+
     if (interaction.commandName === 'lock') {
 
       await interaction.channel.permissionOverwrites.edit(
@@ -686,7 +741,8 @@ Below you can find more relevant information on this infraction.
       });
     }
 
-    // UNLOCK
+    // ================= UNLOCK =================
+
     if (interaction.commandName === 'unlock') {
 
       await interaction.channel.permissionOverwrites.edit(
@@ -701,7 +757,8 @@ Below you can find more relevant information on this infraction.
       });
     }
 
-    // LOCKDOWN
+    // ================= LOCKDOWN =================
+
     if (interaction.commandName === 'lockdown') {
 
       interaction.guild.channels.cache.forEach(async channel => {
@@ -722,7 +779,8 @@ Below you can find more relevant information on this infraction.
       });
     }
 
-    // UNLOCKDOWN
+    // ================= UNLOCKDOWN =================
+
     if (interaction.commandName === 'unlockdown') {
 
       interaction.guild.channels.cache.forEach(async channel => {
@@ -743,7 +801,8 @@ Below you can find more relevant information on this infraction.
       });
     }
 
-    // SLOWMODE
+    // ================= SLOWMODE =================
+
     if (interaction.commandName === 'slowmode') {
 
       const seconds =
@@ -756,16 +815,79 @@ Below you can find more relevant information on this infraction.
       });
     }
 
-    // CLOSE
+    // ================= CLAIM =================
+
+    if (interaction.commandName === 'claim') {
+
+      return interaction.reply({
+        content: `🎫 ${interaction.user} claimed this ticket.`
+      });
+    }
+
+    // ================= ADD USER =================
+
+    if (interaction.commandName === 'add') {
+
+      const user = interaction.options.getUser('user');
+
+      await interaction.channel.permissionOverwrites.edit(
+        user.id,
+        {
+          ViewChannel: true,
+          SendMessages: true
+        }
+      );
+
+      return interaction.reply({
+        content: `✅ Added ${user.tag} to the ticket.`
+      });
+    }
+
+    // ================= REMOVE USER =================
+
+    if (interaction.commandName === 'remove') {
+
+      const user = interaction.options.getUser('user');
+
+      await interaction.channel.permissionOverwrites.delete(user.id);
+
+      return interaction.reply({
+        content: `❌ Removed ${user.tag} from the ticket.`
+      });
+    }
+
+    // ================= CLOSE =================
+
     if (interaction.commandName === 'close') {
 
       await interaction.reply({
-        content: '🔒 Closing ticket...'
+        content: '🔒 Closing ticket in 5 seconds...'
       });
 
-      setTimeout(() => {
-        interaction.channel.delete().catch(() => {});
-      }, 3000);
+      const messages = await interaction.channel.messages.fetch({
+        limit: 100
+      });
+
+      const transcript = messages
+        .reverse()
+        .map(m => `${m.author.tag}: ${m.content}`)
+        .join('\n');
+
+      fs.writeFileSync(
+        `./transcript-${interaction.channel.id}.txt`,
+        transcript
+      );
+
+      await interaction.channel.send({
+        content:
+          '⭐ Please rate your support experience from 1-5 before this ticket closes.'
+      });
+
+      setTimeout(async () => {
+
+        await interaction.channel.delete().catch(() => {});
+
+      }, 5000);
     }
 
   } catch (err) {
