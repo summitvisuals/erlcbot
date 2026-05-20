@@ -459,7 +459,7 @@ Management Inquiries, HR reports, Partnerships & Claiming store items.
       const row = new ActionRowBuilder().addComponents(
         new StringSelectMenuBuilder()
           .setCustomId('ticket_select')
-          .setPlaceholder('Select support department')
+          .setPlaceholder('Select support Team')
           .addOptions([
             {
               label: 'General Support',
