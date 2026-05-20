@@ -7,9 +7,12 @@ const {
   Routes,
   ActionRowBuilder,
   StringSelectMenuBuilder,
+  ButtonBuilder,
+  ButtonStyle,
   PermissionsBitField,
   PermissionFlagsBits,
-  ChannelType
+  ChannelType,
+  AttachmentBuilder
 } = require('discord.js');
 
 const fs = require('fs');
@@ -52,12 +55,10 @@ function isStaff(member, guildId) {
 
 const commands = [
 
-  // PANEL
   new SlashCommandBuilder()
     .setName('panel')
     .setDescription('Send support panel'),
 
-  // CONFIGURE
   new SlashCommandBuilder()
     .setName('configure')
     .setDescription('Configure bot')
@@ -70,9 +71,11 @@ const commands = [
     )
     .addRoleOption(option =>
       option.setName('ticketrole').setDescription('Ticket role')
+    )
+    .addChannelOption(option =>
+      option.setName('logchannel').setDescription('Ticket log channel')
     ),
 
-  // SAY
   new SlashCommandBuilder()
     .setName('say')
     .setDescription('Bot says message')
@@ -83,7 +86,6 @@ const commands = [
         .setRequired(true)
     ),
 
-  // SESSION
   new SlashCommandBuilder()
     .setName('session')
     .setDescription('Manage sessions')
@@ -104,7 +106,6 @@ const commands = [
         .setDescription('End session')
     ),
 
-  // BAN
   new SlashCommandBuilder()
     .setName('ban')
     .setDescription('Ban user')
@@ -120,7 +121,6 @@ const commands = [
         .setDescription('Reason')
     ),
 
-  // KICK
   new SlashCommandBuilder()
     .setName('kick')
     .setDescription('Kick user')
@@ -136,7 +136,6 @@ const commands = [
         .setDescription('Reason')
     ),
 
-  // TIMEOUT
   new SlashCommandBuilder()
     .setName('timeout')
     .setDescription('Timeout user')
@@ -153,7 +152,6 @@ const commands = [
         .setRequired(true)
     ),
 
-  // WARN
   new SlashCommandBuilder()
     .setName('warn')
     .setDescription('Warn user')
@@ -169,7 +167,6 @@ const commands = [
         .setDescription('Reason')
     ),
 
-  // PROMOTION
   new SlashCommandBuilder()
     .setName('promotion')
     .setDescription('Promote staff member')
@@ -186,7 +183,6 @@ const commands = [
         .setRequired(true)
     ),
 
-  // INFRACTION
   new SlashCommandBuilder()
     .setName('infraction')
     .setDescription('Issue staff infraction')
@@ -209,7 +205,6 @@ const commands = [
         .setRequired(true)
     ),
 
-  // CLEAR
   new SlashCommandBuilder()
     .setName('clear')
     .setDescription('Clear messages')
@@ -220,27 +215,22 @@ const commands = [
         .setRequired(true)
     ),
 
-  // LOCK
   new SlashCommandBuilder()
     .setName('lock')
     .setDescription('Lock channel'),
 
-  // UNLOCK
   new SlashCommandBuilder()
     .setName('unlock')
     .setDescription('Unlock channel'),
 
-  // LOCKDOWN
   new SlashCommandBuilder()
     .setName('lockdown')
     .setDescription('Lock all channels'),
 
-  // UNLOCKDOWN
   new SlashCommandBuilder()
     .setName('unlockdown')
     .setDescription('Unlock all channels'),
 
-  // SLOWMODE
   new SlashCommandBuilder()
     .setName('slowmode')
     .setDescription('Set slowmode')
@@ -251,17 +241,14 @@ const commands = [
         .setRequired(true)
     ),
 
-  // CLOSE
   new SlashCommandBuilder()
     .setName('close')
     .setDescription('Close ticket'),
 
-  // CLAIM
   new SlashCommandBuilder()
     .setName('claim')
     .setDescription('Claim ticket'),
 
-  // ADD
   new SlashCommandBuilder()
     .setName('add')
     .setDescription('Add user to ticket')
@@ -272,7 +259,6 @@ const commands = [
         .setRequired(true)
     ),
 
-  // REMOVE
   new SlashCommandBuilder()
     .setName('remove')
     .setDescription('Remove user from ticket')
@@ -282,6 +268,7 @@ const commands = [
         .setDescription('User')
         .setRequired(true)
     )
+
 ];
 
 // ================= REGISTER =================
@@ -313,6 +300,18 @@ client.once('ready', () => {
   console.log(`Logged in as ${client.user.tag}`);
 });
 
+// ================= PING RESPONSE =================
+
+client.on('messageCreate', async message => {
+
+  if (message.author.bot) return;
+
+  if (message.content.toLowerCase() === 'ping') {
+    message.reply('Pong!');
+  }
+
+});
+
 // ================= INTERACTIONS =================
 
 client.on('interactionCreate', async interaction => {
@@ -325,249 +324,177 @@ client.on('interactionCreate', async interaction => {
     config[guildId] = {};
   }
 
-  // ================= TICKET MENU =================
+  try {
 
- // ================= BUTTONS =================
+    // ================= SELECT MENU =================
 
-if (interaction.isButton()) {
+    if (interaction.isStringSelectMenu()) {
 
-  // CLAIM TICKET
+      if (interaction.customId === 'ticket_select') {
 
-  if (interaction.customId === 'claim_ticket') {
+        const type = interaction.values[0];
 
-    await interaction.reply({
-      content: `📌 Ticket claimed by ${interaction.user}`,
-    });
-
-  }
-
-  // CLOSE TICKET
-
-  if (interaction.customId === 'close_ticket') {
-
-    await interaction.reply({
-      content: '🔒 Closing ticket in 5 seconds...'
-    });
-
-    // FETCH MESSAGES
-    const messages = await interaction.channel.messages.fetch({
-      limit: 100
-    });
-
-    // CREATE TRANSCRIPT
-    const transcript = messages
-      .reverse()
-      .map(m => `${m.author.tag}: ${m.content}`)
-      .join('\n');
-
-    // SAVE FILE
-    const fileName = `transcript-${interaction.channel.id}.txt`;
-
-    fs.writeFileSync(fileName, transcript);
-
-    // SEND LOG
-    if (config[guildId]?.logChannel) {
-
-      const logChannel =
-        interaction.guild.channels.cache.get(
-          config[guildId].logChannel
+        const existing = interaction.guild.channels.cache.find(
+          c => c.name === `${type}-${interaction.user.username.toLowerCase()}`
         );
 
-      if (logChannel) {
+        if (existing) {
+          return interaction.reply({
+            content: `❌ You already have a ticket: ${existing}`,
+            ephemeral: true
+          });
+        }
 
-        const logEmbed = new EmbedBuilder()
-          .setColor('#3b82f6')
-          .setTitle('🎫 Ticket Closed')
-          .addFields(
+        const ticketChannel = await interaction.guild.channels.create({
+          name: `${type}-${interaction.user.username}`,
+          type: ChannelType.GuildText,
+          permissionOverwrites: [
             {
-              name: 'Ticket',
-              value: interaction.channel.name
+              id: interaction.guild.id,
+              deny: [PermissionsBitField.Flags.ViewChannel]
             },
             {
-              name: 'Closed By',
-              value: interaction.user.tag
-            }
-          )
-          .setTimestamp();
-
-        await logChannel.send({
-          embeds: [logEmbed],
-          files: [new AttachmentBuilder(fileName)]
-        });
-      }
-    }
-
-    // RATING MESSAGE
-    await interaction.channel.send({
-      content:
-        '⭐ Please rate your support experience from 1-5 before this ticket closes.'
-    });
-
-    // DELETE CHANNEL
-    setTimeout(async () => {
-
-      await interaction.channel.delete().catch(() => {});
-
-      // DELETE FILE
-      fs.unlinkSync(fileName);
-
-    }, 5000);
-  }
-}
-    if (interaction.customId === 'ticket_select') {
-
-      const type = interaction.values[0];
-
-      const existing = interaction.guild.channels.cache.find(
-        c => c.name === `${type}-${interaction.user.username.toLowerCase()}`
-      );
-
-      if (existing) {
-        return interaction.reply({
-          content: `❌ You already have a ticket: ${existing}`,
-          ephemeral: true
-        });
-      }
-// ================= BUTTONS =================
-
-if (interaction.isButton()) {
-
-  // CLAIM TICKET
-
-  if (interaction.customId === 'claim_ticket') {
-
-    await interaction.reply({
-      content: `📌 Ticket claimed by ${interaction.user}`,
-    });
-
-  }
-
-  // CLOSE TICKET
-
-  if (interaction.customId === 'close_ticket') {
-
-    await interaction.reply({
-      content: '🔒 Closing ticket in 5 seconds...'
-    });
-
-    const messages = await interaction.channel.messages.fetch({
-      limit: 100
-    });
-
-    const transcript = messages
-      .reverse()
-      .map(m => `${m.author.tag}: ${m.content}`)
-      .join('\n');
-
-    const fileName = `transcript-${interaction.channel.id}.txt`;
-
-    fs.writeFileSync(fileName, transcript);
-
-    if (config[guildId]?.logChannel) {
-
-      const logChannel =
-        interaction.guild.channels.cache.get(
-          config[guildId].logChannel
-        );
-
-      if (logChannel) {
-
-        const logEmbed = new EmbedBuilder()
-          .setColor('#3b82f6')
-          .setTitle('🎫 Ticket Closed')
-          .addFields(
-            {
-              name: 'Ticket',
-              value: interaction.channel.name
+              id: interaction.user.id,
+              allow: [
+                PermissionsBitField.Flags.ViewChannel,
+                PermissionsBitField.Flags.SendMessages
+              ]
             },
             {
-              name: 'Closed By',
-              value: interaction.user.tag
+              id: config[guildId].ticketRole || interaction.guild.id,
+              allow: [
+                PermissionsBitField.Flags.ViewChannel,
+                PermissionsBitField.Flags.SendMessages
+              ]
             }
-          )
-          .setTimestamp();
-
-        await logChannel.send({
-          embeds: [logEmbed],
-          files: [new AttachmentBuilder(fileName)]
+          ]
         });
-      }
-    }
 
-    await interaction.channel.send({
-      content:
-        '⭐ Please rate your support experience from 1-5 before this ticket closes.'
-    });
-
-    setTimeout(async () => {
-
-      await interaction.channel.delete().catch(() => {});
-
-      fs.unlinkSync(fileName);
-
-    }, 5000);
-  }
-}
-      const ticketChannel = await interaction.guild.channels.create({
-        name: `${type}-${interaction.user.username}`,
-        type: ChannelType.GuildText,
-        permissionOverwrites: [
-          {
-            id: interaction.guild.id,
-            deny: [PermissionsBitField.Flags.ViewChannel]
-          },
-          {
-            id: interaction.user.id,
-            allow: [
-              PermissionsBitField.Flags.ViewChannel,
-              PermissionsBitField.Flags.SendMessages
-            ]
-          },
-          {
-            id: config[guildId].ticketRole || interaction.guild.id,
-            allow: [
-              PermissionsBitField.Flags.ViewChannel,
-              PermissionsBitField.Flags.SendMessages
-            ]
-          }
-        ]
-      });
-
-      const embed = new EmbedBuilder()
-        .setColor('#3b82f6')
-        .setTitle('🎫 Sydney City Roleplay Support')
-        .setDescription(`
+        const embed = new EmbedBuilder()
+          .setColor('#3b82f6')
+          .setTitle('🎫 Sydney City Roleplay Support')
+          .setDescription(`
 Welcome ${interaction.user}
 
 Please explain your issue and staff will assist you shortly.
 `)
-        .setFooter({
-          text: 'Sydney City Roleplay'
-        })
-        .setTimestamp();
+          .setTimestamp();
 
-      await ticketChannel.send({
-        content: config[guildId].ticketRole
-          ? `<@&${config[guildId].ticketRole}>`
-          : '@here',
-        embeds: [embed],
-        allowedMentions: {
-          parse: ['roles']
-        }
-      });
+        const buttons = new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId('claim_ticket')
+            .setLabel('Claim Ticket')
+            .setStyle(ButtonStyle.Primary),
 
-      return interaction.reply({
-        content: `✅ Ticket created: ${ticketChannel}`,
-        ephemeral: true
-      });
+          new ButtonBuilder()
+            .setCustomId('close_ticket')
+            .setLabel('Close Ticket')
+            .setStyle(ButtonStyle.Danger)
+        );
+
+        await ticketChannel.send({
+          content: config[guildId].ticketRole
+            ? `<@&${config[guildId].ticketRole}>`
+            : '@here',
+          embeds: [embed],
+          components: [buttons],
+          allowedMentions: {
+            parse: ['roles']
+          }
+        });
+
+        return interaction.reply({
+          content: `✅ Ticket created: ${ticketChannel}`,
+          ephemeral: true
+        });
+      }
     }
-  }
 
-  // ================= CHAT COMMANDS =================
+    // ================= BUTTONS =================
 
-  if (!interaction.isChatInputCommand()) return;
+    if (interaction.isButton()) {
 
-  try {
+      // CLAIM BUTTON
+
+      if (interaction.customId === 'claim_ticket') {
+
+        return interaction.reply({
+          content: `📌 Ticket claimed by ${interaction.user}`
+        });
+
+      }
+
+      // CLOSE BUTTON
+
+      if (interaction.customId === 'close_ticket') {
+
+        await interaction.reply({
+          content: '🔒 Closing ticket in 5 seconds...'
+        });
+
+        const messages = await interaction.channel.messages.fetch({
+          limit: 100
+        });
+
+        const transcript = messages
+          .reverse()
+          .map(m => `${m.author.tag}: ${m.content}`)
+          .join('\n');
+
+        const fileName = `transcript-${interaction.channel.id}.txt`;
+
+        fs.writeFileSync(fileName, transcript);
+
+        if (config[guildId]?.logChannel) {
+
+          const logChannel =
+            interaction.guild.channels.cache.get(
+              config[guildId].logChannel
+            );
+
+          if (logChannel) {
+
+            const logEmbed = new EmbedBuilder()
+              .setColor('#3b82f6')
+              .setTitle('🎫 Ticket Closed')
+              .addFields(
+                {
+                  name: 'Ticket',
+                  value: interaction.channel.name
+                },
+                {
+                  name: 'Closed By',
+                  value: interaction.user.tag
+                }
+              )
+              .setTimestamp();
+
+            await logChannel.send({
+              embeds: [logEmbed],
+              files: [new AttachmentBuilder(fileName)]
+            });
+          }
+        }
+
+        await interaction.channel.send({
+          content: '⭐ Please rate your support experience from 1-5.'
+        });
+
+        setTimeout(async () => {
+
+          await interaction.channel.delete().catch(() => {});
+
+          if (fs.existsSync(fileName)) {
+            fs.unlinkSync(fileName);
+          }
+
+        }, 5000);
+      }
+    }
+
+    // ================= CHAT COMMANDS =================
+
+    if (!interaction.isChatInputCommand()) return;
 
     // ================= CONFIGURE =================
 
@@ -576,12 +503,13 @@ Please explain your issue and staff will assist you shortly.
       const staffRole = interaction.options.getRole('staffrole');
       const ownerRole = interaction.options.getRole('ownerrole');
       const ticketRole = interaction.options.getRole('ticketrole');
+      const logChannel = interaction.options.getChannel('logchannel');
 
       if (staffRole) config[guildId].staffRole = staffRole.id;
       if (ownerRole) config[guildId].ownerRole = ownerRole.id;
       if (ticketRole) config[guildId].ticketRole = ticketRole.id;
-const logChannel =
-  interaction.options.getChannel('logchannel');
+      if (logChannel) config[guildId].logChannel = logChannel.id;
+
       saveAll();
 
       return interaction.reply({
@@ -598,33 +526,14 @@ const logChannel =
         .setColor('#3b82f6')
         .setTitle('🎫 Sydney City Roleplay Support')
         .setDescription(`
-G'day! do you need support? Well, look no more, here it is.
-
-**General Support**
-General Inquiries, Questions & Reporting Members
-
-------------------------------------------------
-
-**Internal Affairs Support**
-Reporting Staff & Inquiries
-
-------------------------------------------------
-
-**Management Support**
-Management Inquiries, HR reports, Partnerships & Claiming store items.
-
-------------------------------------------------
-
-⚠️ Fake tickets will result in moderation.
+Choose a department below to open a support ticket.
 `)
-        .setFooter({
-          text: 'Sydney City Roleplay'
-        });
+        .setTimestamp();
 
       const row = new ActionRowBuilder().addComponents(
         new StringSelectMenuBuilder()
           .setCustomId('ticket_select')
-          .setPlaceholder('Select support Team')
+          .setPlaceholder('Select support team')
           .addOptions([
             {
               label: 'General Support',
@@ -654,10 +563,12 @@ Management Inquiries, HR reports, Partnerships & Claiming store items.
     // ================= STAFF CHECK =================
 
     if (!isStaff(interaction.member, guildId)) {
+
       return interaction.reply({
         content: '❌ Not staff.',
         ephemeral: true
       });
+
     }
 
     // ================= SAY =================
@@ -842,11 +753,6 @@ Management Inquiries, HR reports, Partnerships & Claiming store items.
       const embed = new EmbedBuilder()
         .setColor('#ef4444')
         .setTitle('Staff Consequences & Discipline')
-        .setDescription(`
-The high-ranking team at Sydney City Roleplay is sad to announce the infraction of ${user}.
-
-Below you can find more relevant information on this infraction.
-`)
         .addFields(
           {
             name: 'Username',
@@ -985,11 +891,11 @@ Below you can find more relevant information on this infraction.
     if (interaction.commandName === 'claim') {
 
       return interaction.reply({
-        content: `🎫 ${interaction.user} claimed this ticket.`
+        content: `📌 ${interaction.user} claimed this ticket.`
       });
     }
 
-    // ================= ADD USER =================
+    // ================= ADD =================
 
     if (interaction.commandName === 'add') {
 
@@ -1008,7 +914,7 @@ Below you can find more relevant information on this infraction.
       });
     }
 
-    // ================= REMOVE USER =================
+    // ================= REMOVE =================
 
     if (interaction.commandName === 'remove') {
 
@@ -1029,29 +935,8 @@ Below you can find more relevant information on this infraction.
         content: '🔒 Closing ticket in 5 seconds...'
       });
 
-      const messages = await interaction.channel.messages.fetch({
-        limit: 100
-      });
-
-      const transcript = messages
-        .reverse()
-        .map(m => `${m.author.tag}: ${m.content}`)
-        .join('\n');
-
-      fs.writeFileSync(
-        `./transcript-${interaction.channel.id}.txt`,
-        transcript
-      );
-
-      await interaction.channel.send({
-        content:
-          '⭐ Please rate your support experience from 1-5 before this ticket closes.'
-      });
-
       setTimeout(async () => {
-
         await interaction.channel.delete().catch(() => {});
-
       }, 5000);
     }
 
@@ -1065,22 +950,13 @@ Below you can find more relevant information on this infraction.
         content: '❌ Error occurred.',
         ephemeral: true
       });
+
     }
-  }
-});
-// ================= PING RESPONSE =================
-
-client.on('messageCreate', async message => {
-
-  if (message.author.bot) return;
-
-  if (message.content.toLowerCase() === 'ping') {
-
-    message.reply('Pong!');
 
   }
 
 });
+
 // ================= LOGIN =================
 
 client.login(process.env.TOKEN);
