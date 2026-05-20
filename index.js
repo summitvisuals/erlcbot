@@ -18,6 +18,8 @@ const {
 const fs = require('fs');
 require('dotenv').config();
 
+// ================= CLIENT =================
+
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -26,8 +28,6 @@ const client = new Client({
     GatewayIntentBits.MessageContent
   ]
 });
-
-let activeSession = null;
 
 // ================= FILES =================
 
@@ -67,9 +67,6 @@ const commands = [
       option.setName('staffrole').setDescription('Staff role')
     )
     .addRoleOption(option =>
-      option.setName('ownerrole').setDescription('Owner role')
-    )
-    .addRoleOption(option =>
       option.setName('ticketrole').setDescription('Ticket role')
     )
     .addChannelOption(option =>
@@ -84,26 +81,6 @@ const commands = [
         .setName('message')
         .setDescription('Message')
         .setRequired(true)
-    ),
-
-  new SlashCommandBuilder()
-    .setName('session')
-    .setDescription('Manage sessions')
-    .addSubcommand(sub =>
-      sub
-        .setName('start')
-        .setDescription('Start session')
-        .addStringOption(option =>
-          option
-            .setName('code')
-            .setDescription('Server code')
-            .setRequired(true)
-        )
-    )
-    .addSubcommand(sub =>
-      sub
-        .setName('end')
-        .setDescription('End session')
     ),
 
   new SlashCommandBuilder()
@@ -129,11 +106,6 @@ const commands = [
         .setName('user')
         .setDescription('User')
         .setRequired(true)
-    )
-    .addStringOption(option =>
-      option
-        .setName('reason')
-        .setDescription('Reason')
     ),
 
   new SlashCommandBuilder()
@@ -168,44 +140,6 @@ const commands = [
     ),
 
   new SlashCommandBuilder()
-    .setName('promotion')
-    .setDescription('Promote staff member')
-    .addUserOption(option =>
-      option
-        .setName('user')
-        .setDescription('User')
-        .setRequired(true)
-    )
-    .addStringOption(option =>
-      option
-        .setName('rank')
-        .setDescription('New rank')
-        .setRequired(true)
-    ),
-
-  new SlashCommandBuilder()
-    .setName('infraction')
-    .setDescription('Issue staff infraction')
-    .addUserOption(option =>
-      option
-        .setName('user')
-        .setDescription('User')
-        .setRequired(true)
-    )
-    .addStringOption(option =>
-      option
-        .setName('punishment')
-        .setDescription('Punishment')
-        .setRequired(true)
-    )
-    .addStringOption(option =>
-      option
-        .setName('reason')
-        .setDescription('Reason')
-        .setRequired(true)
-    ),
-
-  new SlashCommandBuilder()
     .setName('clear')
     .setDescription('Clear messages')
     .addIntegerOption(option =>
@@ -224,14 +158,6 @@ const commands = [
     .setDescription('Unlock channel'),
 
   new SlashCommandBuilder()
-    .setName('lockdown')
-    .setDescription('Lock all channels'),
-
-  new SlashCommandBuilder()
-    .setName('unlockdown')
-    .setDescription('Unlock all channels'),
-
-  new SlashCommandBuilder()
     .setName('slowmode')
     .setDescription('Set slowmode')
     .addIntegerOption(option =>
@@ -242,36 +168,16 @@ const commands = [
     ),
 
   new SlashCommandBuilder()
-    .setName('close')
-    .setDescription('Close ticket'),
-
-  new SlashCommandBuilder()
     .setName('claim')
     .setDescription('Claim ticket'),
 
   new SlashCommandBuilder()
-    .setName('add')
-    .setDescription('Add user to ticket')
-    .addUserOption(option =>
-      option
-        .setName('user')
-        .setDescription('User')
-        .setRequired(true)
-    ),
-
-  new SlashCommandBuilder()
-    .setName('remove')
-    .setDescription('Remove user from ticket')
-    .addUserOption(option =>
-      option
-        .setName('user')
-        .setDescription('User')
-        .setRequired(true)
-    )
+    .setName('close')
+    .setDescription('Close ticket')
 
 ];
 
-// ================= REGISTER =================
+// ================= REGISTER COMMANDS =================
 
 const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
 
@@ -283,10 +189,10 @@ const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
 
     await rest.put(
       Routes.applicationCommands(process.env.CLIENT_ID),
-      { body: commands.map(c => c.toJSON()) }
+      { body: commands.map(cmd => cmd.toJSON()) }
     );
 
-    console.log('Commands registered.');
+    console.log('Slash commands registered.');
 
   } catch (err) {
     console.error(err);
@@ -300,14 +206,14 @@ client.once('ready', () => {
   console.log(`Logged in as ${client.user.tag}`);
 });
 
-// ================= PING RESPONSE =================
+// ================= MESSAGE EVENTS =================
 
 client.on('messageCreate', async message => {
 
   if (message.author.bot) return;
 
   if (message.content.toLowerCase() === 'ping') {
-    message.reply('Pong!');
+    return message.reply('Pong!');
   }
 
 });
@@ -335,7 +241,9 @@ client.on('interactionCreate', async interaction => {
         const type = interaction.values[0];
 
         const existing = interaction.guild.channels.cache.find(
-          c => c.name === `${type}-${interaction.user.username.toLowerCase()}`
+          c =>
+            c.name ===
+            `${type}-${interaction.user.username.toLowerCase()}`
         );
 
         if (existing) {
@@ -346,7 +254,7 @@ client.on('interactionCreate', async interaction => {
         }
 
         const ticketChannel = await interaction.guild.channels.create({
-          name: `${type}-${interaction.user.username}`,
+          name: `${type}-${interaction.user.username}`.toLowerCase(),
           type: ChannelType.GuildText,
           permissionOverwrites: [
             {
@@ -372,7 +280,7 @@ client.on('interactionCreate', async interaction => {
 
         const embed = new EmbedBuilder()
           .setColor('#3b82f6')
-          .setTitle('🎫 Sydney City Roleplay Support')
+          .setTitle('🎫 Support Ticket')
           .setDescription(`
 Welcome ${interaction.user}
 
@@ -381,6 +289,7 @@ Please explain your issue and staff will assist you shortly.
           .setTimestamp();
 
         const buttons = new ActionRowBuilder().addComponents(
+
           new ButtonBuilder()
             .setCustomId('claim_ticket')
             .setLabel('Claim Ticket')
@@ -390,6 +299,7 @@ Please explain your issue and staff will assist you shortly.
             .setCustomId('close_ticket')
             .setLabel('Close Ticket')
             .setStyle(ButtonStyle.Danger)
+
         );
 
         await ticketChannel.send({
@@ -397,17 +307,16 @@ Please explain your issue and staff will assist you shortly.
             ? `<@&${config[guildId].ticketRole}>`
             : '@here',
           embeds: [embed],
-          components: [buttons],
-          allowedMentions: {
-            parse: ['roles']
-          }
+          components: [buttons]
         });
 
         return interaction.reply({
           content: `✅ Ticket created: ${ticketChannel}`,
           ephemeral: true
         });
+
       }
+
     }
 
     // ================= BUTTONS =================
@@ -445,6 +354,8 @@ Please explain your issue and staff will assist you shortly.
 
         fs.writeFileSync(fileName, transcript);
 
+        // SEND LOG
+
         if (config[guildId]?.logChannel) {
 
           const logChannel =
@@ -473,12 +384,10 @@ Please explain your issue and staff will assist you shortly.
               embeds: [logEmbed],
               files: [new AttachmentBuilder(fileName)]
             });
-          }
-        }
 
-        await interaction.channel.send({
-          content: '⭐ Please rate your support experience from 1-5.'
-        });
+          }
+
+        }
 
         setTimeout(async () => {
 
@@ -489,34 +398,14 @@ Please explain your issue and staff will assist you shortly.
           }
 
         }, 5000);
+
       }
+
     }
 
     // ================= CHAT COMMANDS =================
 
     if (!interaction.isChatInputCommand()) return;
-
-    // ================= CONFIGURE =================
-
-    if (interaction.commandName === 'configure') {
-
-      const staffRole = interaction.options.getRole('staffrole');
-      const ownerRole = interaction.options.getRole('ownerrole');
-      const ticketRole = interaction.options.getRole('ticketrole');
-      const logChannel = interaction.options.getChannel('logchannel');
-
-      if (staffRole) config[guildId].staffRole = staffRole.id;
-      if (ownerRole) config[guildId].ownerRole = ownerRole.id;
-      if (ticketRole) config[guildId].ticketRole = ticketRole.id;
-      if (logChannel) config[guildId].logChannel = logChannel.id;
-
-      saveAll();
-
-      return interaction.reply({
-        content: '✅ Configuration saved.',
-        ephemeral: true
-      });
-    }
 
     // ================= PANEL =================
 
@@ -524,13 +413,12 @@ Please explain your issue and staff will assist you shortly.
 
       const embed = new EmbedBuilder()
         .setColor('#3b82f6')
-        .setTitle('🎫 Sydney City Roleplay Support')
-        .setDescription(`
-Choose a department below to open a support ticket.
-`)
+        .setTitle('🎫 Support Panel')
+        .setDescription('Choose a department below.')
         .setTimestamp();
 
       const row = new ActionRowBuilder().addComponents(
+
         new StringSelectMenuBuilder()
           .setCustomId('ticket_select')
           .setPlaceholder('Select support team')
@@ -540,24 +428,43 @@ Choose a department below to open a support ticket.
               value: 'general'
             },
             {
-              label: 'Internal Affairs',
-              value: 'internal-affairs'
+              label: 'Staff Support',
+              value: 'staff'
             },
             {
-              label: 'Management Support',
+              label: 'Management',
               value: 'management'
-            },
-            {
-              label: 'Owner Support',
-              value: 'owner'
             }
           ])
+
       );
 
       return interaction.reply({
         embeds: [embed],
         components: [row]
       });
+
+    }
+
+    // ================= CONFIGURE =================
+
+    if (interaction.commandName === 'configure') {
+
+      const staffRole = interaction.options.getRole('staffrole');
+      const ticketRole = interaction.options.getRole('ticketrole');
+      const logChannel = interaction.options.getChannel('logchannel');
+
+      if (staffRole) config[guildId].staffRole = staffRole.id;
+      if (ticketRole) config[guildId].ticketRole = ticketRole.id;
+      if (logChannel) config[guildId].logChannel = logChannel.id;
+
+      saveAll();
+
+      return interaction.reply({
+        content: '✅ Configuration saved.',
+        ephemeral: true
+      });
+
     }
 
     // ================= STAFF CHECK =================
@@ -565,7 +472,7 @@ Choose a department below to open a support ticket.
     if (!isStaff(interaction.member, guildId)) {
 
       return interaction.reply({
-        content: '❌ Not staff.',
+        content: '❌ You are not staff.',
         ephemeral: true
       });
 
@@ -585,49 +492,7 @@ Choose a department below to open a support ticket.
         content: '✅ Message sent.',
         ephemeral: true
       });
-    }
 
-    // ================= SESSION =================
-
-    if (interaction.commandName === 'session') {
-
-      const sub = interaction.options.getSubcommand();
-
-      if (sub === 'start') {
-
-        const code = interaction.options.getString('code');
-
-        activeSession = {
-          host: interaction.user.username,
-          code
-        };
-
-        const embed = new EmbedBuilder()
-          .setColor('#3b82f6')
-          .setTitle('🚓 Sydney City Roleplay Session')
-          .setDescription(`Hosted by ${interaction.user}`)
-          .addFields({
-            name: 'Join Code',
-            value: `\`${code}\``
-          });
-
-        return interaction.reply({
-          content: '@everyone',
-          embeds: [embed],
-          allowedMentions: {
-            parse: ['everyone']
-          }
-        });
-      }
-
-      if (sub === 'end') {
-
-        activeSession = null;
-
-        return interaction.reply({
-          content: '🔴 Session ended.'
-        });
-      }
     }
 
     // ================= BAN =================
@@ -638,14 +503,14 @@ Choose a department below to open a support ticket.
       const reason =
         interaction.options.getString('reason') || 'No reason';
 
-      const member =
-        await interaction.guild.members.fetch(user.id);
+      const member = await interaction.guild.members.fetch(user.id);
 
       await member.ban({ reason });
 
       return interaction.reply({
         content: `🔨 Banned ${user.tag}`
       });
+
     }
 
     // ================= KICK =================
@@ -653,17 +518,15 @@ Choose a department below to open a support ticket.
     if (interaction.commandName === 'kick') {
 
       const user = interaction.options.getUser('user');
-      const reason =
-        interaction.options.getString('reason') || 'No reason';
 
-      const member =
-        await interaction.guild.members.fetch(user.id);
+      const member = await interaction.guild.members.fetch(user.id);
 
-      await member.kick(reason);
+      await member.kick();
 
       return interaction.reply({
         content: `👢 Kicked ${user.tag}`
       });
+
     }
 
     // ================= TIMEOUT =================
@@ -671,17 +534,16 @@ Choose a department below to open a support ticket.
     if (interaction.commandName === 'timeout') {
 
       const user = interaction.options.getUser('user');
-      const minutes =
-        interaction.options.getInteger('minutes');
+      const minutes = interaction.options.getInteger('minutes');
 
-      const member =
-        await interaction.guild.members.fetch(user.id);
+      const member = await interaction.guild.members.fetch(user.id);
 
       await member.timeout(minutes * 60000);
 
       return interaction.reply({
         content: `⏰ Timed out ${user.tag}`
       });
+
     }
 
     // ================= WARN =================
@@ -703,97 +565,21 @@ Choose a department below to open a support ticket.
       return interaction.reply({
         content: `⚠️ Warned ${user.tag}`
       });
-    }
 
-    // ================= PROMOTION =================
-
-    if (interaction.commandName === 'promotion') {
-
-      const user = interaction.options.getUser('user');
-      const rank = interaction.options.getString('rank');
-
-      const embed = new EmbedBuilder()
-        .setColor('#22c55e')
-        .setTitle('📈 Staff Promotion')
-        .setDescription(`${user} has been promoted.`)
-        .addFields(
-          {
-            name: 'New Rank',
-            value: rank
-          },
-          {
-            name: 'Promoted By',
-            value: interaction.user.tag
-          }
-        );
-
-      await interaction.channel.send({
-        embeds: [embed]
-      });
-
-      return interaction.reply({
-        content: `✅ Promotion logged.`,
-        ephemeral: true
-      });
-    }
-
-    // ================= INFRACTION =================
-
-    if (interaction.commandName === 'infraction') {
-
-      const user = interaction.options.getUser('user');
-      const punishment =
-        interaction.options.getString('punishment');
-      const reason =
-        interaction.options.getString('reason');
-
-      const infractionID =
-        Math.random().toString(36).substring(2, 12).toUpperCase();
-
-      const embed = new EmbedBuilder()
-        .setColor('#ef4444')
-        .setTitle('Staff Consequences & Discipline')
-        .addFields(
-          {
-            name: 'Username',
-            value: user.tag
-          },
-          {
-            name: 'Punishment',
-            value: punishment
-          },
-          {
-            name: 'Reason',
-            value: reason
-          },
-          {
-            name: 'Infraction ID',
-            value: infractionID
-          }
-        );
-
-      await interaction.channel.send({
-        embeds: [embed]
-      });
-
-      return interaction.reply({
-        content: `✅ Infraction issued.`,
-        ephemeral: true
-      });
     }
 
     // ================= CLEAR =================
 
     if (interaction.commandName === 'clear') {
 
-      const amount =
-        interaction.options.getInteger('amount');
+      const amount = interaction.options.getInteger('amount');
 
       await interaction.channel.bulkDelete(amount, true);
 
       return interaction.reply({
         content: `🧹 Deleted ${amount} messages`
       });
+
     }
 
     // ================= LOCK =================
@@ -802,14 +588,13 @@ Choose a department below to open a support ticket.
 
       await interaction.channel.permissionOverwrites.edit(
         interaction.guild.roles.everyone,
-        {
-          SendMessages: false
-        }
+        { SendMessages: false }
       );
 
       return interaction.reply({
         content: '🔒 Channel locked'
       });
+
     }
 
     // ================= UNLOCK =================
@@ -818,58 +603,13 @@ Choose a department below to open a support ticket.
 
       await interaction.channel.permissionOverwrites.edit(
         interaction.guild.roles.everyone,
-        {
-          SendMessages: true
-        }
+        { SendMessages: true }
       );
 
       return interaction.reply({
         content: '🔓 Channel unlocked'
       });
-    }
 
-    // ================= LOCKDOWN =================
-
-    if (interaction.commandName === 'lockdown') {
-
-      interaction.guild.channels.cache.forEach(async channel => {
-
-        if (channel.type === ChannelType.GuildText) {
-
-          await channel.permissionOverwrites.edit(
-            interaction.guild.roles.everyone,
-            {
-              SendMessages: false
-            }
-          ).catch(() => {});
-        }
-      });
-
-      return interaction.reply({
-        content: '🚨 Lockdown enabled.'
-      });
-    }
-
-    // ================= UNLOCKDOWN =================
-
-    if (interaction.commandName === 'unlockdown') {
-
-      interaction.guild.channels.cache.forEach(async channel => {
-
-        if (channel.type === ChannelType.GuildText) {
-
-          await channel.permissionOverwrites.edit(
-            interaction.guild.roles.everyone,
-            {
-              SendMessages: true
-            }
-          ).catch(() => {});
-        }
-      });
-
-      return interaction.reply({
-        content: '✅ Lockdown removed.'
-      });
     }
 
     // ================= SLOWMODE =================
@@ -884,6 +624,7 @@ Choose a department below to open a support ticket.
       return interaction.reply({
         content: `🐢 Slowmode set to ${seconds}s`
       });
+
     }
 
     // ================= CLAIM =================
@@ -893,38 +634,7 @@ Choose a department below to open a support ticket.
       return interaction.reply({
         content: `📌 ${interaction.user} claimed this ticket.`
       });
-    }
 
-    // ================= ADD =================
-
-    if (interaction.commandName === 'add') {
-
-      const user = interaction.options.getUser('user');
-
-      await interaction.channel.permissionOverwrites.edit(
-        user.id,
-        {
-          ViewChannel: true,
-          SendMessages: true
-        }
-      );
-
-      return interaction.reply({
-        content: `✅ Added ${user.tag} to the ticket.`
-      });
-    }
-
-    // ================= REMOVE =================
-
-    if (interaction.commandName === 'remove') {
-
-      const user = interaction.options.getUser('user');
-
-      await interaction.channel.permissionOverwrites.delete(user.id);
-
-      return interaction.reply({
-        content: `❌ Removed ${user.tag} from the ticket.`
-      });
     }
 
     // ================= CLOSE =================
@@ -936,8 +646,11 @@ Choose a department below to open a support ticket.
       });
 
       setTimeout(async () => {
+
         await interaction.channel.delete().catch(() => {});
+
       }, 5000);
+
     }
 
   } catch (err) {
