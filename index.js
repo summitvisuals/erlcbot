@@ -1068,7 +1068,19 @@ Below you can find more relevant information on this infraction.
     }
   }
 });
+// ================= PING RESPONSE =================
 
+client.on('messageCreate', async message => {
+
+  if (message.author.bot) return;
+
+  if (message.content.toLowerCase() === 'ping') {
+
+    message.reply('Pong!');
+
+  }
+
+});
 // ================= LOGIN =================
 
 client.login(process.env.TOKEN);
