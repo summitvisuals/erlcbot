@@ -327,8 +327,93 @@ client.on('interactionCreate', async interaction => {
 
   // ================= TICKET MENU =================
 
-  if (interaction.isStringSelectMenu()) {
+ // ================= BUTTONS =================
 
+if (interaction.isButton()) {
+
+  // CLAIM TICKET
+
+  if (interaction.customId === 'claim_ticket') {
+
+    await interaction.reply({
+      content: `📌 Ticket claimed by ${interaction.user}`,
+    });
+
+  }
+
+  // CLOSE TICKET
+
+  if (interaction.customId === 'close_ticket') {
+
+    await interaction.reply({
+      content: '🔒 Closing ticket in 5 seconds...'
+    });
+
+    // FETCH MESSAGES
+    const messages = await interaction.channel.messages.fetch({
+      limit: 100
+    });
+
+    // CREATE TRANSCRIPT
+    const transcript = messages
+      .reverse()
+      .map(m => `${m.author.tag}: ${m.content}`)
+      .join('\n');
+
+    // SAVE FILE
+    const fileName = `transcript-${interaction.channel.id}.txt`;
+
+    fs.writeFileSync(fileName, transcript);
+
+    // SEND LOG
+    if (config[guildId]?.logChannel) {
+
+      const logChannel =
+        interaction.guild.channels.cache.get(
+          config[guildId].logChannel
+        );
+
+      if (logChannel) {
+
+        const logEmbed = new EmbedBuilder()
+          .setColor('#3b82f6')
+          .setTitle('🎫 Ticket Closed')
+          .addFields(
+            {
+              name: 'Ticket',
+              value: interaction.channel.name
+            },
+            {
+              name: 'Closed By',
+              value: interaction.user.tag
+            }
+          )
+          .setTimestamp();
+
+        await logChannel.send({
+          embeds: [logEmbed],
+          files: [new AttachmentBuilder(fileName)]
+        });
+      }
+    }
+
+    // RATING MESSAGE
+    await interaction.channel.send({
+      content:
+        '⭐ Please rate your support experience from 1-5 before this ticket closes.'
+    });
+
+    // DELETE CHANNEL
+    setTimeout(async () => {
+
+      await interaction.channel.delete().catch(() => {});
+
+      // DELETE FILE
+      fs.unlinkSync(fileName);
+
+    }, 5000);
+  }
+}
     if (interaction.customId === 'ticket_select') {
 
       const type = interaction.values[0];
@@ -495,7 +580,8 @@ Please explain your issue and staff will assist you shortly.
       if (staffRole) config[guildId].staffRole = staffRole.id;
       if (ownerRole) config[guildId].ownerRole = ownerRole.id;
       if (ticketRole) config[guildId].ticketRole = ticketRole.id;
-
+const logChannel =
+  interaction.options.getChannel('logchannel');
       saveAll();
 
       return interaction.reply({
